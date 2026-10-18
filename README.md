@@ -2,6 +2,10 @@
 
 A free, hands-on course on agentic engineering with Claude Code. It covers the agent loop, CLAUDE.md, plan mode, goals and loops, hooks, skills and sub-agent orchestration. Each topic is a long-form lesson with interactive labs that run in the browser.
 
+**Live site:** https://trungnv184.github.io/claude-code-academy/
+
+Every push to `main` redeploys automatically through `.github/workflows/pages.yml`.
+
 ## Run it
 
 It's a static site with no build step:

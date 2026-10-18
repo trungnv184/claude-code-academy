@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Playground · Conducting Claude</title>
+<meta name="description" content="A stateful, simulated Claude Code session in your browser: switch permission modes, set goals, install hooks, trigger skills and delegate to sub-agents.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .pg-wrap { max-width: 1280px; margin: 0 auto; padding: 36px 24px 72px; }
+  .pg-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 8px; }
+  .pg-head h1 { font-family: var(--serif); font-size: clamp(32px, 4.5vw, 44px); letter-spacing: -.02em; margin: 0 0 8px; font-weight: 600; }
+  .pg-head p { margin: 0; color: var(--ink-2); font-family: var(--serif); font-size: 19px; max-width: 720px; line-height: 1.5; }
+  .pg-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; margin-top: 20px; }
+  .pg-grid .term { margin: 0; }
+  .pg-grid .term-screen { min-height: 520px; max-height: 620px; }
+  .pg-side { position: sticky; top: 72px; }
+  .pg-notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 36px; }
+  .pg-note { border-top: 2px solid var(--ink); padding-top: 12px; }
+  .pg-note h3 { margin: 0 0 6px; font-size: 16px; }
+  .pg-note p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  @media (max-width: 960px) {
+    .pg-grid { grid-template-columns: 1fr; }
+    .pg-side { position: static; }
+    .pg-grid .term-screen { min-height: 360px; max-height: 460px; }
+  }
+  @media (max-width: 600px) { .pg-wrap { padding: 24px 16px 56px; } }
+</style>
+</head>
+<body data-root="." data-page="playground">
+
+<div class="pg-wrap">
+  <div class="pg-head">
+    <div>
+      <div class="eyebrow">Interactive Playground</div>
+      <h1>Drive a Claude Code session</h1>
+      <p>A scripted simulation with real state. Switch modes, install hooks, set a goal, and watch each choice change what the "agent" does next. The panel on the right shows the harness as it evolves.</p>
+    </div>
+    <button class="btn" id="pg-reset" type="button">↺ Reset playground</button>
+  </div>
+
+  <div class="callout info" style="margin:18px 0 0"><div class="callout-icon">ℹ️</div><div><p><strong>This is not a real model.</strong> Responses are scripted for teaching. The commands and concepts mirror Claude Code; outputs are illustrative.</p></div></div>
+
+  <div class="pg-grid">
+    <div id="pg-term"></div>
+    <aside class="pg-side" id="pg-panel" aria-label="Session state"></aside>
+  </div>
+
+  <div class="pg-notes">
+    <div class="pg-note"><h3>Mission: guardrails beat approvals</h3><p>Ask Claude to “delete the build folder”. It asks; you click yes on autopilot. Now run <code>/hooks install block-rm</code> and ask again. That's <a href="lessons/05-hooks.html">lesson 5</a> in one minute.</p></div>
+    <div class="pg-note"><h3>Mission: plan, then act</h3><p>Run <code>/plan add a search bar</code>. You get a plan and no edits. Pick <code>acceptEdits</code> in the panel (or cycle with <code>shift+tab</code>: plan → auto → default → acceptEdits), then say “implement the plan”. See <a href="lessons/03-plan-mode.html">lesson 3</a>.</p></div>
+    <div class="pg-note"><h3>Mission: a finish line it can't fake</h3><p>Set <code>/goal tests pass, lint is clean and the dark mode toggle works</code>. Watch the evaluator say “not yet met” until the evidence is in the transcript. See <a href="lessons/04-goals-loops.html">lesson 4</a>.</p></div>
+    <div class="pg-note"><h3>Mission: skills &amp; sub-agents</h3><p>Ask for “release notes” without naming a skill, then “use the code-reviewer agent to review my changes”. See lessons <a href="lessons/06-skills.html">6</a> and <a href="lessons/07-subagents.html">7</a>.</p></div>
+  </div>
+</div>
+
+<footer class="site-foot">
+  Conducting Claude — an independent, community learning resource. Not affiliated with Anthropic.
+  The playground is a <em>simulation</em>; see the <a href="https://code.claude.com/docs" target="_blank" rel="noopener">official docs</a> for real behavior.
+</footer>
+
+<script src="assets/app.js"></script>
+<script src="assets/widgets/playground.js"></script>
+</body>
+</html>

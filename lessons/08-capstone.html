@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capstone: Ship a Real Project · Conducting Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+<style>
+  .milestone { display: flex; align-items: baseline; gap: 12px; }
+  .milestone .ms-tag {
+    flex: none; font-family: var(--sans); font-size: 13px; font-weight: 700; letter-spacing: .04em;
+    background: var(--ink); color: var(--bg); padding: 3px 9px; border-radius: 6px; position: relative; top: -4px;
+  }
+  .ms-meta { display: grid; grid-template-columns: 110px 1fr; gap: 6px 14px; margin: 0 0 22px; font-family: var(--sans); font-size: 15px; }
+  .ms-meta dt { font-weight: 650; color: var(--ink-3); font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; padding-top: 2px; }
+  .ms-meta dd { margin: 0; }
+  .prompt {
+    margin: 20px 0; padding: 14px 18px 14px 44px; position: relative; border-radius: var(--radius);
+    background: var(--bg-elev); border: 1px dashed var(--accent); font-family: var(--mono); font-size: 13.5px; line-height: 1.6; white-space: pre-wrap;
+  }
+  .prompt::before { content: ">"; position: absolute; left: 18px; top: 13px; color: var(--accent); font-weight: 700; }
+  .prompt-label { font-family: var(--sans); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--accent-ink); font-weight: 700; margin: 24px 0 -12px; }
+  .checkpoint { border-left: 3px solid var(--green); background: var(--green-soft); padding: 12px 18px; border-radius: 0 var(--radius) var(--radius) 0; margin: 24px 0; font-family: var(--sans); font-size: 15px; }
+  .checkpoint strong { color: var(--green); }
+  @media (max-width: 600px) { .ms-meta { grid-template-columns: 1fr; } .ms-meta dt { padding-top: 8px; } }
+</style>
+</head>
+<body data-root=".." data-lesson="08">
+<main>
+<article class="article">
+  <div class="eyebrow">Lesson 8 · Capstone project</div>
+  <h1>Capstone: Ship a Real Project</h1>
+  <p class="dek">Seven lessons, seven layers. Now we stack them. You'll build <strong>Snip</strong> — a small, real URL shortener — and by the end, your repo won't just contain an app. It'll contain the harness that built it, ready for the next feature and the next teammate.</p>
+  <div class="byline"><span>60 min build</span><span>9 milestones</span><span>Tracker + replay</span><span>Quiz</span></div>
+
+  <div class="objectives">
+    <h4>By the end of this capstone you will have</h4>
+    <ul>
+      <li>A working Express + SQLite URL shortener with a Vitest suite and a tiny HTML front end</li>
+      <li>A committed <code>.claude/</code> folder: settings, three hooks, one skill, one reviewer agent</li>
+      <li>Shipped a feature with <code>/goal</code>, two more in parallel worktrees, and wired headless Claude into CI</li>
+      <li>A personal retro on what to keep, what to cut, and what to teach your team</li>
+    </ul>
+  </div>
+
+  <div data-toc></div>
+
+  <h2>The project, and the point</h2>
+  <p>Snip is deliberately boring. Paste a long URL, get back <code>http://localhost:3000/aZ3kq9</code>, visit it, get redirected, and see a click count. Every developer has built something like it, which is exactly why it's a good capstone: you already know what "correct" looks like, so all of your attention can go to <em>how</em> the work gets done.</p>
+  <p>Here's the rule for the next hour: <strong>you don't write application code.</strong> You write context, plans, finish lines, guardrails, and helpers. Claude writes the code. When something goes wrong — and it will, a little — resist the urge to fix it by hand. Ask yourself which layer of the harness would have prevented it, and fix <em>that</em>.</p>
+  <div class="pull">An app is what you ship once. A harness is what ships every feature after it.</div>
+
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 760 210" role="img" aria-label="Timeline of nine milestones, each adding a harness layer">
+        <line x1="40" y1="70" x2="720" y2="70" class="d-line" stroke-width="2"/>
+        <g font-size="12.5" text-anchor="middle">
+          <circle cx="40"  cy="70" r="11" class="d-box" stroke-width="1.5"/><text x="40"  y="74" font-weight="700" font-size="11">M0</text><text x="40"  y="104" class="d-muted">/init</text>
+          <circle cx="125" cy="70" r="11" class="d-box" stroke-width="1.5"/><text x="125" y="74" font-weight="700" font-size="11">M1</text><text x="125" y="104" class="d-muted">CLAUDE.md</text>
+          <circle cx="210" cy="70" r="11" class="d-box" stroke-width="1.5"/><text x="210" y="74" font-weight="700" font-size="11">M2</text><text x="210" y="104" class="d-muted">hooks</text>
+          <circle cx="295" cy="70" r="11" class="d-accent" stroke-width="1.5"/><text x="295" y="74" font-weight="700" font-size="11">M3</text><text x="295" y="104" class="d-muted">plan</text>
+          <circle cx="380" cy="70" r="11" class="d-accent" stroke-width="1.5"/><text x="380" y="74" font-weight="700" font-size="11">M4</text><text x="380" y="104" class="d-muted">/goal</text>
+          <circle cx="465" cy="70" r="11" class="d-box" stroke-width="1.5"/><text x="465" y="74" font-weight="700" font-size="11">M5</text><text x="465" y="104" class="d-muted">skill</text>
+          <circle cx="550" cy="70" r="11" class="d-accent" stroke-width="1.5"/><text x="550" y="74" font-weight="700" font-size="11">M6</text><text x="550" y="104" class="d-muted">sub-agents</text>
+          <circle cx="635" cy="70" r="11" class="d-box" stroke-width="1.5"/><text x="635" y="74" font-weight="700" font-size="11">M7</text><text x="635" y="104" class="d-muted">/loop · CI</text>
+          <circle cx="720" cy="70" r="11" class="d-box" stroke-width="1.5"/><text x="720" y="74" font-weight="700" font-size="11">M8</text><text x="720" y="104" class="d-muted">retro</text>
+        </g>
+        <text x="167" y="30" text-anchor="middle" class="d-muted" font-size="12.5">Set the stage (no app code yet)</text>
+        <text x="422" y="30" text-anchor="middle" class="d-muted" font-size="12.5">Build the core</text>
+        <text x="635" y="30" text-anchor="middle" class="d-muted" font-size="12.5">Scale out</text>
+        <text x="380" y="160" text-anchor="middle" font-size="13.5" font-weight="600">Notice the order: guardrails go in before the first line of app code.</text>
+        <text x="380" y="182" text-anchor="middle" class="d-muted" font-size="12.5">Hooks installed at M2 protect every milestone after it.</text>
+      </svg>
+    </div>
+    <figcaption>The build order. Orange milestones are where the agent does the heavy lifting.</figcaption>
+  </figure>
+
+  <p>Track your progress as you go. The checklist below remembers where you left off, so you can split the capstone across sittings.</p>
+  <div data-widget="capstone-tracker"></div>
+
+  <div class="callout info"><div class="callout-icon">ℹ️</div><div><div class="callout-title">Prerequisites</div><p>Node 20+, git, <code>jq</code> (used by the hook scripts), and Claude Code installed and logged in. Every file in this lesson is complete — copy, paste, and adapt.</p></div></div>
+
+  <!-- ===================== M0 ===================== -->
+  <h2 class="milestone"><span class="ms-tag">M0</span>Repo setup &amp; /init</h2>
+  <dl class="ms-meta">
+    <dt>Goal</dt><dd>An empty-but-runnable project and a first draft of project memory.</dd>
+    <dt>Layer</dt><dd>Context (lesson 2)</dd>
+    <dt>Time</dt><dd>5 minutes</dd>
+  </dl>
+  <p>Scaffold by hand — it's thirty seconds of typing, and it means the dependencies are <em>your</em> choice rather than the model's guess.</p>
+<pre><code class="lang-bash">mkdir snip &amp;&amp; cd snip
+git init
+npm init -y
+npm pkg set type=module
+npm i express better-sqlite3 nanoid
+npm i -D vitest supertest eslint @eslint/js prettier
+npm pkg set scripts.dev="node --watch src/server.js" scripts.test="vitest run" scripts.lint="eslint ." scripts.format="prettier --write ."
+mkdir -p src test public
+printf 'node_modules/\n*.db\n.claude/settings.local.json\n' &gt; .gitignore
+git add -A &amp;&amp; git commit -m "chore: scaffold snip"
+claude</code></pre>
+  <p>Inside the session, let Claude take a first pass at project memory:</p>
+  <div class="prompt-label">Type</div>
+  <div class="prompt">/init</div>
+  <div class="checkpoint"><strong>Checkpoint:</strong> a <code>CLAUDE.md</code> exists at the repo root. It will be generic and a little too long. That's fine — M1 is where you make it yours.</div>
+
+  <!-- ===================== M1 ===================== -->
+  <h2 class="milestone"><span class="ms-tag">M1</span>Hand-tune CLAUDE.md</h2>
+  <dl class="ms-meta">
+    <dt>Goal</dt><dd>A short, opinionated memory file that prevents the "amnesia" failure mode.</dd>
+    <dt>Layer</dt><dd>Context (lesson 2)</dd>
+    <dt>Time</dt><dd>10 minutes</dd>
+  </dl>
+  <p><code>/init</code> describes what it <em>sees</em>. Your job is to add what it <em>can't</em> see: decisions, taste, and landmines. Replace the draft with something like this — note how little prose there is. Every line should change a behavior; if deleting a line wouldn't change what Claude does, delete it.</p>
+  <div class="code-file"><span>CLAUDE.md</span><span>~40 lines</span></div>
+<pre><code class="lang-md"># Snip — URL shortener
+
+## Commands
+- `npm test` — Vitest, runs in &lt;2s. Run it after every change.
+- `npm run lint` — ESLint flat config. Must exit 0 before you say "done".
+- `npm run dev` — server on http://localhost:3000
+
+## Architecture
+- `src/app.js` builds the Express app (no listen) → imported by tests via supertest
+- `src/server.js` only calls `app.listen`
+- `src/routes/*` → thin HTTP layer; `src/services/*` → logic; `src/db.js` → better-sqlite3
+- `public/index.html` — single static page, vanilla JS, no framework
+
+## Conventions
+- ES modules, async/await, no classes unless state demands it
+- Validate input at the route; services assume valid data
+- Errors: `res.status(4xx).json({ error: "message" })` — never leak stack traces
+- Short codes: 6 chars from nanoid's url-safe alphabet
+- Every new route gets a test in `test/` named after the route file
+
+## Never
+- Never use an in-memory array as the store — always SQLite
+- Never add a dependency without asking first
+- Never edit `test/fixtures/*` to make a test pass
+
+## Workflow
+- For anything bigger than one file: plan first, write the plan to PLAN.md
+- Spec lives in SPEC.md; the plan lives in PLAN.md — keep both current
+- API reference: @docs/API.md
+</code></pre>
+  <div class="callout tip"><div class="callout-icon">💡</div><div><div class="callout-title">Why "Never" lines live here and in hooks</div><p>CLAUDE.md is advisory — Claude will follow it most of the time. For anything where "most of the time" isn't good enough, M2 adds a hook. The CLAUDE.md line still helps: it stops Claude from <em>trying</em>, which saves a turn.</p></div></div>
+  <div class="checkpoint"><strong>Checkpoint:</strong> <code>git commit -m "docs: hand-tuned CLAUDE.md"</code>. Create an empty <code>docs/API.md</code> so the import resolves.</div>
+
+  <!-- ===================== M2 ===================== -->
+  <h2 class="milestone"><span class="ms-tag">M2</span>Settings, permissions &amp; hooks</h2>
+  <dl class="ms-meta">
+    <dt>Goal</dt><dd>Fewer permission prompts for safe commands; hard blocks for dangerous ones; formatting and a test gate that run without anyone remembering.</dd>
+    <dt>Layer</dt><dd>Hooks (lesson 5)</dd>
+    <dt>Time</dt><dd>15 minutes</dd>
+  </dl>
+  <p>This is the milestone people skip, and the one that pays back most. Three hooks, one settings file:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Hook</th><th>Event</th><th>Job</th></tr></thead>
+    <tbody>
+      <tr><td><code>block-dangerous.sh</code></td><td><code>PreToolUse</code> · <code>Bash</code></td><td>Exit 2 on <code>rm -rf</code>, force push, hard reset, <code>DROP TABLE</code></td></tr>
+      <tr><td><code>format.sh</code></td><td><code>PostToolUse</code> · <code>Edit|Write</code></td><td>Run Prettier on the file that was just changed</td></tr>
+      <tr><td><code>stop-gate.sh</code></td><td><code>Stop</code></td><td>If tests fail, refuse to stop and hand Claude the failure log</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="code-file"><span>.claude/settings.json</span><span>commit this</span></div>
+<pre><code class="lang-json">{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm test *)",
+      "Bash(npm run lint)",
+      "Bash(npx vitest *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "ask": ["Bash(npm install *)", "Bash(npm i *)"],
+    "deny": ["Read(./.env)", "Bash(git push *)"]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-dangerous.sh" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format.sh" }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-gate.sh", "timeout": 120 }]
+      }
+    ]
+  }
+}</code></pre>
+
+  <div class="code-file"><span>.claude/hooks/block-dangerous.sh</span><span>PreToolUse</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# PreToolUse(Bash): refuse destructive commands.
+# Exit 2 = block the tool call; stderr is shown to Claude as the reason.
+cmd=$(jq -r '.tool_input.command // ""')
+if echo "$cmd" | grep -Eq 'rm -rf|git push .*(-f|--force)|git reset --hard|DROP TABLE'; then
+  echo "Blocked by project policy: '$cmd'. If this is really needed, ask the user to run it." &gt;&amp;2
+  exit 2
+fi
+exit 0</code></pre>
+
+  <div class="code-file"><span>.claude/hooks/format.sh</span><span>PostToolUse</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# PostToolUse(Edit|Write): format the file Claude just touched. Never blocks.
+file=$(jq -r '.tool_input.file_path // ""')
+case "$file" in
+  *.js|*.json|*.md|*.html|*.css) npx prettier --write "$file" &gt;/dev/null 2&gt;&amp;1 ;;
+esac
+exit 0</code></pre>
+
+  <div class="code-file"><span>.claude/hooks/stop-gate.sh</span><span>Stop</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# Stop: Claude may only finish a turn while the test suite is green.
+input=$(cat)
+# If this stop was already caused by our block, don't loop forever — let it stop.
+if [ "$(echo "$input" | jq -r '.stop_hook_active // false')" = "true" ]; then exit 0; fi
+log=$(mktemp)
+if ! npm test --silent &gt;"$log" 2&gt;&amp;1; then
+  echo "Tests are failing — fix them before finishing. Last 30 lines:" &gt;&amp;2
+  tail -n 30 "$log" &gt;&amp;2
+  exit 2
+fi
+exit 0</code></pre>
+<pre><code class="lang-bash">chmod +x .claude/hooks/*.sh</code></pre>
+  <p>Now prove the guardrail works <em>before</em> you rely on it. Inside Claude:</p>
+  <div class="prompt-label">Type</div>
+  <div class="prompt">/hooks</div>
+  <div class="prompt-label">Then try</div>
+  <div class="prompt">Run rm -rf node_modules to clean up</div>
+  <div class="checkpoint"><strong>Checkpoint:</strong> <code>/hooks</code> lists all three hooks, and the <code>rm -rf</code> attempt comes back as <em>"Blocked by project policy"</em>. Claude should then suggest you run it yourself. Commit <code>.claude/</code>.</div>
+  <div class="callout warn"><div class="callout-icon">⚠️</div><div><div class="callout-title">The Stop gate is strong medicine</div><p>A test-gated Stop hook fires on <em>every</em> turn end — even when you just asked a question. On a tiny suite that's fine. On a slow one, gate it on whether source files actually changed (e.g. check <code>git status --porcelain src test</code> first), or rely on <code>/goal</code> for the finish line instead.</p></div></div>
+
+  <!-- ===================== M3 ===================== -->
+  <h2 class="milestone"><span class="ms-tag">M3</span>Spec by interview, then plan mode</h2>
+  <dl class="ms-meta">
+    <dt>Goal</dt><dd>A SPEC.md you agree with and a PLAN.md Claude will execute — before a single route exists.</dd>
+    <dt>Layer</dt><dd>Plan mode (lesson 3)</dd>
+    <dt>Time</dt><dd>10 minutes</dd>
+  </dl>
+  <p>Instead of writing a spec yourself, have Claude <strong>interview you</strong>. It is remarkably good at surfacing the questions you'd only discover halfway through implementation: what happens on duplicate URLs? Do codes expire? What's a valid URL?</p>
+  <div class="prompt-label">Type</div>
+  <div class="prompt">I want to build Snip, a URL shortener (see CLAUDE.md for stack). Interview me about it in detail — data model, validation, edge cases, error responses, what the front end needs. Ask one batch of questions at a time. Don't write code. When we're done, write the result to SPEC.md.</div>
+  <p>Answer honestly; say "you decide, keep it simple" where you don't care. Then clear the conversation — the spec is on disk, the interview chatter isn't needed — and switch to plan mode with <kbd>Shift</kbd>+<kbd>Tab</kbd> (twice, until the status bar reads <em>plan mode on</em>) or <code>/plan</code>:</p>
+  <div class="prompt-label">Type</div>
+  <div class="prompt">/clear</div>
+  <div class="prompt">/plan Read SPEC.md and CLAUDE.md. Produce an implementation plan for the MVP: POST /api/links (create), GET /:code (redirect + count click), GET /api/links/:code (info), and public/index.html. Order the steps so each ends with a passing test. Include the SQLite schema.</div>
+  <p>Read the plan like a code reviewer. Push back on anything you'd push back on in a PR — "use a UNIQUE index rather than checking in code", "return 422 not 400 for bad URLs". When it's right, approve it and ask Claude to save it:</p>
+  <div class="prompt">Save this plan to PLAN.md as a checklist, then stop.</div>
+  <div class="checkpoint"><strong>Checkpoint:</strong> <code>SPEC.md</code> and <code>PLAN.md</code> committed. No <code>src/</code> files yet. You've spent ~15 minutes and written zero code — and you've already caught the decisions that cause rewrites.</div>
+
+  <!-- ===================== M4 ===================== -->
+  <h2 class="milestone"><span class="ms-tag">M4</span>Implement with /goal</h2>
+  <dl class="ms-meta">
+    <dt>Goal</dt><dd>The MVP, built autonomously, with a finish line Claude can't fake.</dd>
+    <dt>Layer</dt><dd>Goals &amp; loops (lesson 4)</dd>
+    <dt>Time</dt><dd>10 minutes of yours, ~15 of Claude's</dd>
+  </dl>
+  <p>Switch to auto-accept edits (<kbd>Shift</kbd>+<kbd>Tab</kbd> until <em>accept edits on</em>) so you aren't approving every file. Your hooks are the safety net now. Then set the goal:</p>
+  <div class="prompt-label">Type</div>
+  <div class="prompt">/goal Implement PLAN.md. Done means: all vitest tests pass, npm run lint exits 0, and POST /api/links + GET /:code work per PLAN.md (show the test output proving it), with PLAN.md checkboxes ticked — or stop after 25 turns.</div>
+  <p>Setting a goal immediately starts working on it. After every turn, a small, fast evaluator model reads the transcript and decides <em>met</em>, <em>not yet met</em> or <em>impossible</em>. Two details matter here:</p>
+  <ul>
+    <li><strong>The evaluator can't run tools.</strong> It judges what Claude has <em>shown</em>. That's why the condition says "show the test output proving it" — you're asking Claude to put evidence in the transcript.</li>
+    <li><strong>"Or stop after 25 turns"</strong> is your budget. Without a stop clause, a goal that's impossible as written can burn a lot of turns before the evaluator calls it.</li>
+  </ul>
+  <p>Meanwhile your Stop hook is quietly doing its job: any time Claude tries to end a turn with red tests, it gets the failure log back instead. The goal sets the <em>destination</em>; the hook guarantees the <em>floor</em>.</p>
+  <div class="checkpoint"><strong>Checkpoint:</strong> the evaluator reports the goal met. Now <em>you</em> verify — <code>npm run dev</code>, shorten a link in the browser, click it. Read the diff. Commit at green: <code>feat: snip MVP</code>.</div>
+
+  <!-- ===================== M5 ===================== -->
+  <h2 class="milestone"><span class="ms-tag">M5</span>Teach it once: a custom skill</h2>
+  <dl class="ms-meta">
+    <dt>Goal</dt><dd>Package "how we add an endpoint here" so every future endpoint follows the same recipe.</dd>
+    <dt>Layer</dt><dd>Skills (lesson 6)</dd>
+    <dt>Time</dt><dd>10 minutes</dd>
+  </dl>
+  <p>You'll add more endpoints to Snip. Each time, you want the same shape: failing test first, thin route, logic in a service, validation, docs updated. That's a recipe — and recipes belong in skills, not in your head or in a 300-line CLAUDE.md.</p>
+  <div class="code-file"><span>.claude/skills/add-endpoint/SKILL.md</span><span>loaded only when relevant</span></div>
+<pre><code class="lang-md">---
+name: add-endpoint
+description: Add a new HTTP endpoint to Snip (Express route + service + Vitest test + API docs). Use when the user asks for a new API route, endpoint, handler, or stats/analytics URL.
+argument-hint: "[METHOD /path] [what it should return]"
+allowed-tools: Read, Grep, Edit, Write, Bash(npm test *), Bash(npm run lint)
+---
+
+# Add an endpoint to Snip
+
+Target: $ARGUMENTS
+
+1. **Test first.** Create or extend `test/&lt;route-file&gt;.test.js` using supertest
+   against `src/app.js`. Cover: happy path, 404 for unknown code, 4xx for bad input.
+   Run `npm test` and confirm the new test FAILS for the right reason.
+2. **Service.** Put logic in `src/services/&lt;name&gt;.js`. Pure functions taking `db`.
+   Use prepared statements — never string-concatenate SQL.
+3. **Route.** Add a thin handler in `src/routes/`, register it in `src/app.js`.
+   Validate params at the route. Errors: `res.status(4xx).json({ error })`.
+4. **Verify.** `npm test` and `npm run lint` must both pass.
+5. **Document.** Append the endpoint to `docs/API.md` using the format in
+   `api-entry-template.md` (next to this file).
+6. Report: the route, the test names, and the passing test output.
+</code></pre>
+  <div class="code-file"><span>.claude/skills/add-endpoint/api-entry-template.md</span><span>supporting file</span></div>
+<pre><code class="lang-md">### `METHOD /path`
+One-sentence purpose.
+
+**Response 200**
+```json
+{ "example": "body" }
+```
+**Errors:** `404` unknown code · `422` invalid input
+</code></pre>
+  <p>Note that the request below never mentions the skill. The description is what Claude matches against — which is why it's written as <em>"Use when the user asks for…"</em>.</p>
+  <div class="prompt-label">Type</div>
+  <div class="prompt">Add an analytics endpoint: GET /api/links/:code/stats returning total clicks, clicks per day for the last 7 days, and the created_at date.</div>
+  <div class="checkpoint"><strong>Checkpoint:</strong> you see Claude load the <code>add-endpoint</code> skill, write a failing test first, then implement. <code>docs/API.md</code> gains an entry in the template's format. If the skill <em>didn't</em> trigger, sharpen its <code>description</code> — that's the lesson 6 debugging loop.</div>
+
+  <!-- ===================== M6 ===================== -->
+  <h2 class="milestone"><span class="ms-tag">M6</span>Sub-agents &amp; parallel worktrees</h2>
+  <dl class="ms-meta">
+    <dt>Goal</dt><dd>An independent reviewer for every diff, and two features built at the same time without stepping on each other.</dd>
+    <dt>Layer</dt><dd>Sub-agents (lesson 7)</dd>
+    <dt>Time</dt><dd>15 minutes</dd>
+  </dl>
+  <h3>A reviewer with fresh eyes</h3>
+  <p>The agent that wrote the code is the worst-placed agent to review it: its context is full of its own reasoning. A sub-agent starts clean, sees only the diff, and is restricted to read-only tools so it can't "helpfully" fix things mid-review.</p>
+  <div class="code-file"><span>.claude/agents/code-reviewer.md</span><span>sub-agent</span></div>
+<pre><code class="lang-md">---
+name: code-reviewer
+description: Reviews uncommitted changes in Snip for bugs, security issues, and missing tests. Use proactively after implementing a feature and before committing.
+tools: Read, Grep, Glob, Bash
+model: sonnet
+color: purple
+---
+
+You are a senior reviewer for Snip, a small Express + SQLite URL shortener.
+
+Review ONLY the current changes (`git diff` and `git diff --staged`).
+Do not edit files. Your output is a review, not a fix.
+
+Check, in priority order:
+1. Correctness: off-by-one, wrong status codes, unhandled null/undefined
+2. Security: SQL built by string concatenation, open redirects (we must only
+   redirect to http/https URLs), unvalidated input, leaked stack traces
+3. Tests: every new branch has a test; tests assert behavior, not implementation
+4. Conventions from CLAUDE.md
+
+Output format:
+- **Blocking** — must fix, with file:line and a one-line suggested fix
+- **Should fix** — worth doing in this PR
+- **Nit** — optional
+End with a one-line verdict: APPROVE or CHANGES REQUESTED.
+</code></pre>
+  <div class="prompt-label">Type</div>
+  <div class="prompt">Use the code-reviewer agent to review the stats endpoint changes. Then fix every Blocking item and re-run the reviewer until it approves.</div>
+
+  <h3>Two features, two worktrees, zero collisions</h3>
+  <p>Next up: <strong>custom aliases</strong> (<code>/my-talk</code> instead of <code>/aZ3kq9</code>) and <strong>link expiry</strong>. They're independent, so build them simultaneously. Each <code>--worktree</code> session gets its own checkout and branch, so two agents can edit <code>src/</code> at the same time without overwriting each other.</p>
+<pre><code class="lang-bash"># terminal 1
+claude --worktree aliases
+# terminal 2
+claude --worktree expiry</code></pre>
+  <div class="prompt-label">Terminal 1</div>
+  <div class="prompt">/goal Add custom aliases per SPEC.md: POST /api/links accepts optional "alias" (3–32 chars, [a-z0-9-]), 409 if taken. Use the add-endpoint conventions. Done when tests + lint pass and the code-reviewer agent approves — or stop after 20 turns.</div>
+  <div class="prompt-label">Terminal 2</div>
+  <div class="prompt">/goal Add link expiry: optional "expiresInDays" on create; GET /:code returns 410 Gone after expiry. Done when tests + lint pass and the code-reviewer agent approves — or stop after 20 turns.</div>
+  <p>While they run, you're free. That's the orchestrator stage from lesson 1: you decomposed the work, set verifiable finish lines, and now you review results instead of keystrokes. When both finish, merge — each worktree session works on its own branch (by default <code>worktree-aliases</code> and <code>worktree-expiry</code>):</p>
+<pre><code class="lang-bash">git merge worktree-aliases
+git merge worktree-expiry   # both touch the create route; resolve with Claude if needed
+npm test</code></pre>
+  <div class="checkpoint"><strong>Checkpoint:</strong> both features merged, suite green, reviewer approved each branch. If the second merge conflicted, ask Claude to resolve it <em>and</em> run the tests — conflict resolution is just another act → verify loop.</div>
+
+  <!-- ===================== M7 ===================== -->
+  <h2 class="milestone"><span class="ms-tag">M7</span>/loop &amp; headless Claude in CI</h2>
+  <dl class="ms-meta">
+    <dt>Goal</dt><dd>Agents that keep working when you're not typing: one babysitting your PR, one reviewing every PR in CI.</dd>
+    <dt>Layer</dt><dd>Loops (lesson 4) + automation</dd>
+    <dt>Time</dt><dd>10 minutes</dd>
+  </dl>
+  <h3>Babysit the PR with /loop</h3>
+  <p>Push a branch and open a PR (you push — remember, your settings deny <code>git push</code> for Claude). Then:</p>
+  <div class="prompt-label">Type</div>
+  <div class="prompt">/loop 10m Check the CI status of my open PR with `gh pr checks`. If a check failed, read its log with `gh run view --log-failed`, fix the cause locally, run tests, and commit. Tell me when a push is needed. When all checks are green, say so and stop.</div>
+  <p><code>/loop</code> re-runs the prompt every 10 minutes while the session is open and idle. Leave out the interval and Claude paces itself. Press <kbd>Esc</kbd> to stop a self-paced loop. Notice the division of labor: the loop does the watching and fixing; the irreversible action — pushing — stays with you.</p>
+
+  <h3>Headless review on every PR</h3>
+  <p><code>claude -p</code> runs a single prompt non-interactively — perfect for CI. The official GitHub Action wraps it. The quickest setup is <code>/install-github-app</code> from inside Claude Code; here's the manual version with a custom review prompt:</p>
+  <div class="code-file"><span>.github/workflows/claude-review.yml</span><span>CI</span></div>
+<pre><code>name: Claude PR review
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this PR against CLAUDE.md conventions. Focus on correctness,
+            open-redirect risks, and missing tests. Post one concise review comment.
+          claude_args: "--max-turns 10"</code></pre>
+  <p>And because the harness lives in the repo, the CI agent reads the same <code>CLAUDE.md</code>, the same skills, the same agents. Locally or in CI, it's one team, one set of rules. For quick scripts, the bare CLI works too:</p>
+<pre><code class="lang-bash">claude -p "Summarize what changed on this branch vs main for a release note" \
+  --output-format json --max-turns 5 | jq -r '.result'</code></pre>
+  <div class="checkpoint"><strong>Checkpoint:</strong> a PR shows a review comment from Claude. The loop told you when CI went green.</div>
+
+  <!-- ===================== M8 ===================== -->
+  <h2 class="milestone"><span class="ms-tag">M8</span>Retro: commit the harness</h2>
+  <dl class="ms-meta">
+    <dt>Goal</dt><dd>Turn one good session into a repeatable team asset.</dd>
+    <dt>Layer</dt><dd>All of them</dd>
+    <dt>Time</dt><dd>5 minutes</dd>
+  </dl>
+  <p>Here's what your repo looks like now. Everything under <code>.claude/</code> except <code>settings.local.json</code> gets committed — that's the point. A teammate who clones Snip gets your memory, guardrails, recipes and reviewer on their very first prompt.</p>
+  <div class="code-file"><span>snip/</span><span>final tree</span></div>
+<pre><code>snip/
+├── CLAUDE.md                        # M1 · project memory (committed)
+├── SPEC.md                          # M3 · what we're building
+├── PLAN.md                          # M3 · how — ticked off in M4
+├── docs/
+│   └── API.md                       # grown by the add-endpoint skill
+├── .claude/
+│   ├── settings.json                # M2 · permissions + hook wiring (committed)
+│   ├── settings.local.json          # your personal overrides (gitignored)
+│   ├── hooks/
+│   │   ├── block-dangerous.sh       # PreToolUse · Bash
+│   │   ├── format.sh                # PostToolUse · Edit|Write
+│   │   └── stop-gate.sh             # Stop · tests must be green
+│   ├── skills/
+│   │   └── add-endpoint/
+│   │       ├── SKILL.md             # M5
+│   │       └── api-entry-template.md
+│   └── agents/
+│       └── code-reviewer.md         # M6
+├── .github/workflows/
+│   └── claude-review.yml            # M7 · headless review
+├── public/
+│   └── index.html
+├── src/
+│   ├── app.js  server.js  db.js
+│   ├── routes/  links.js  redirect.js  stats.js
+│   └── services/  links.js  stats.js
+└── test/
+    ├── links.test.js  redirect.test.js  stats.test.js
+    ├── aliases.test.js  expiry.test.js</code></pre>
+  <p>Close with a retro. Ask Claude to help, then edit its answer — the goal is <em>your</em> lessons, captured where the next session will see them:</p>
+  <div class="prompt-label">Type</div>
+  <div class="prompt">Look back over this project's git log and our CLAUDE.md. What went wrong or needed a retry? Propose at most three one-line additions to CLAUDE.md that would have prevented them. Don't edit anything yet.</div>
+  <p>Answer these for yourself, too:</p>
+  <ol>
+    <li>Which milestone produced the most rework? Which layer, added earlier, would have prevented it?</li>
+    <li>Which hook fired most? Is it catching real mistakes, or adding friction?</li>
+    <li>What did you do by hand twice? That's your next skill.</li>
+    <li>Where did you trust "done" and later find it wasn't? Tighten that goal condition.</li>
+  </ol>
+  <div class="callout pro"><div class="callout-icon">🎼</div><div><div class="callout-title">The compounding loop</div><p>Each retro makes the next project faster: a CLAUDE.md line here, a sharper hook there, a new skill. Six months in, your <code>.claude/</code> folder is the most valuable thing in the repo — it's how your team <em>thinks</em>, made executable.</p></div></div>
+
+  <h2>Replay: the whole build in two minutes</h2>
+  <p>A condensed, simulated replay of the session you just ran. Watch for how each layer shows up in the transcript — the hook lines, the evaluator, the sub-agents.</p>
+  <div id="term-replay"></div>
+
+  <h2>Key takeaways</h2>
+  <ul>
+    <li><strong>Harness before code.</strong> Memory, guardrails and a plan took the first 40 minutes — and made the next 20 almost boring.</li>
+    <li><strong>Each layer has one job.</strong> CLAUDE.md informs, plans align, goals define done, hooks enforce, skills repeat, sub-agents isolate.</li>
+    <li><strong>Evidence beats assertions.</strong> Goal conditions ask for <em>shown</em> proof; Stop hooks check it for real; a reviewer agent checks it with fresh eyes.</li>
+    <li><strong>Commit the harness.</strong> It's the part of the project that makes every future feature cheaper — for you and everyone who clones the repo.</li>
+  </ul>
+
+  <div id="quiz"></div>
+</article>
+</main>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/widgets/capstone-tracker.js"></script>
+<script>
+TUTOR.ready(function () {
+  TUTOR.terminal("#term-replay", {
+    title: "claude — ~/snip (replay)",
+    interactive: false,
+    autoplay: [
+      ["sys", "── M0 · setup ──", 200],
+      ["user", "/init"],
+      ["tool", "Write(CLAUDE.md)"], ["toolout", "Drafted from package.json + layout"],
+      ["sys", "── M2 · guardrails ──", 200],
+      ["user", "Run rm -rf node_modules to clean up"],
+      ["tool", "Bash(rm -rf node_modules)"],
+      ["hook", "PreToolUse block-dangerous.sh → exit 2: Blocked by project policy"],
+      ["claude", "That command is blocked by this project's hook. You can run it yourself if it's needed."],
+      ["sys", "── M3 · plan ──", 200],
+      ["mode", "  ⏸ plan mode on"],
+      ["user", "/plan Read SPEC.md and plan the MVP"],
+      ["tool", "Read(SPEC.md)"], ["toolout", "4 endpoints · SQLite · 422 on invalid URL"],
+      ["plan", "1) db.js + schema  2) POST /api/links  3) GET /:code + clicks  4) GET /api/links/:code  5) index.html"],
+      ["user", "Save this plan to PLAN.md as a checklist, then stop."],
+      ["sys", "── M4 · build with /goal ──", 200],
+      ["mode", "  ⏵⏵ accept edits on"],
+      ["user", "/goal Implement PLAN.md. Done means all vitest tests pass, lint exits 0 … or stop after 25 turns"],
+      ["tool", "Write(test/links.test.js)"], ["hook", "PostToolUse format.sh → prettier ✓"],
+      ["tool", "Bash(npm test)"], ["toolout", "✗ 3 failed — POST /api/links 404"],
+      ["tool", "Write(src/routes/links.js)"], ["hook", "PostToolUse format.sh → prettier ✓"],
+      ["tool", "Bash(npm test)"], ["toolout", "✓ 11 passed"],
+      ["tool", "Bash(npm run lint)"], ["toolout", "✓ 0 problems"],
+      ["hook", "Stop stop-gate.sh → tests green ✓"],
+      ["hook", "Goal evaluator → met (tests + lint shown passing, PLAN.md ticked)"],
+      ["sys", "── M5 · skill ──", 200],
+      ["user", "Add GET /api/links/:code/stats with clicks per day"],
+      ["tool", "Skill(add-endpoint)"], ["toolout", "Loaded .claude/skills/add-endpoint/SKILL.md"],
+      ["tool", "Bash(npm test)"], ["toolout", "✓ 15 passed (4 new)"],
+      ["sys", "── M6 · sub-agents ──", 200],
+      ["agent", "⏺ code-reviewer(Review the stats endpoint changes)"],
+      ["toolout", "Blocking: stats.js:14 builds SQL with a template string → use a prepared statement"],
+      ["tool", "Edit(src/services/stats.js)"],
+      ["agent", "⏺ code-reviewer(Re-review)"], ["toolout", "APPROVE"],
+      ["sys", "  [worktree aliases] goal met · 21 tests   [worktree expiry] goal met · 19 tests"],
+      ["sys", "── M7 · loop ──", 200],
+      ["user", "/loop 10m Check CI on my PR; fix failures; stop when green"],
+      ["sys", "  (10m later) gh pr checks → lint ✗ → fixed unused import, committed. Push needed."],
+      ["sys", "  (20m later) gh pr checks → all green ✓ — loop stopped"],
+      ["claude", "Snip is shipped: 5 endpoints, 26 tests, reviewer-approved, CI green. The harness is committed under .claude/."]
+    ]
+  });
+
+  TUTOR.quiz("#quiz", { questions: [
+    { q: "Why do the guardrail hooks go in at M2, before any application code exists?",
+      options: ["Hooks can't be added later", "So every later milestone runs under them — protection compounds", "Hooks make the model smarter", "It's required by /init"],
+      answer: 1, why: "Hooks protect every turn after they're installed. Adding them first means the autonomous milestones (M4, M6, M7) run inside the guardrails." },
+    { q: "The M4 goal condition says 'show the test output proving it'. Why?",
+      options: ["To make the transcript longer", "The goal evaluator can't run tools — it judges only what's in the transcript", "Vitest requires it", "It disables the Stop hook"],
+      answer: 1, why: "The /goal evaluator is a small model reading the transcript. Asking for shown evidence makes 'met' a judgment about facts, not claims." },
+    { q: "What is the reviewer sub-agent's key advantage over asking the main session to review its own diff?",
+      options: ["It uses a bigger model", "It starts with a clean context and read-only tools", "It can push to git", "It's cheaper per token"],
+      answer: 1, why: "Fresh context means no bias from the author's own reasoning; read-only tools keep it a reviewer rather than a second author." },
+    { q: "Why build aliases and expiry with two `claude --worktree` sessions rather than two sessions in the same checkout?",
+      options: ["Worktrees are faster", "Each gets its own checkout and branch, so parallel edits don't overwrite each other", "Only worktrees support /goal", "Worktrees skip hooks"],
+      answer: 1, why: "Parallel agents in one directory race on the same files. Worktrees isolate them; you merge the branches afterward." },
+    { q: "Which file should NOT be committed?",
+      options: [".claude/settings.json", ".claude/settings.local.json", ".claude/agents/code-reviewer.md", "CLAUDE.md"],
+      answer: 1, why: "settings.local.json is for personal overrides and is meant to be gitignored. Everything else is the shared team harness." }
+  ]});
+});
+</script>
+</body>
+</html>

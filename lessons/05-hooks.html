@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hooks: Deterministic Guardrails · Conducting Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-root=".." data-lesson="05">
+<main>
+<article class="article">
+  <div class="eyebrow">Lesson 5 · Lifecycle automation</div>
+  <h1>Hooks: Deterministic Guardrails</h1>
+  <p class="dek">Everything you've written so far, including CLAUDE.md, plans and goal conditions, is a request. Hooks are the first thing in this course that is a <em>rule</em>: code that runs every time, whatever the model is thinking.</p>
+  <div class="byline"><span>25 min read</span><span>1 lab</span><span>1 simulator</span><span>5 recipes</span><span>Quiz</span></div>
+
+  <div class="objectives">
+    <h4>By the end of this lesson you will</h4>
+    <ul>
+      <li>Decide when something belongs in a hook rather than in CLAUDE.md</li>
+      <li>Know the hook lifecycle events and which ones can block</li>
+      <li>Read and write the settings.json hook schema, including matchers and handler types</li>
+      <li>Use exit codes and JSON output to block, allow, ask or add context</li>
+      <li>Ship five production recipes: a command firewall, file protection, auto-format, a test gate on Stop, and notifications</li>
+    </ul>
+  </div>
+
+  <div data-toc></div>
+
+  <h2>Advisory vs deterministic</h2>
+  <p>Picture the session from lesson 1, sixty turns in. Your CLAUDE.md says "never edit <code>.env</code>." It said that on turn one too. Since then the context has filled with test logs, file dumps and a long debugging detour, and the instruction is now one sentence among a hundred thousand tokens. Most of the time Claude still follows it. "Most of the time" is fine for a style preference. It is not fine for "don't force-push to main."</p>
+  <p>That's the distinction this whole lesson rests on:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th></th><th>Instructions (CLAUDE.md, prompts, goals)</th><th>Hooks</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Who decides</strong></td><td>The model, every time</td><td>Your code, every time</td></tr>
+      <tr><td><strong>Reliability</strong></td><td>High, not guaranteed; can degrade with context</td><td>Deterministic: the script runs on every matching event</td></tr>
+      <tr><td><strong>Good for</strong></td><td>Conventions, preferences, how to approach work</td><td>Invariants, safety, mandatory checks, side effects</td></tr>
+      <tr><td><strong>Cost of being wrong</strong></td><td>A style nit</td><td>Should be zero; that's the point</td></tr>
+    </tbody>
+  </table></div>
+  <div class="pull">If breaking a rule would make you say "how did this happen?", the rule belongs in a hook.</div>
+  <p>A good heuristic: write it in CLAUDE.md first. The first time it gets violated in a way that costs you, promote it to a hook. Hooks also cover things that aren't rules at all, just chores you want done every time: format the file after every edit, ping me when you need input, load the latest ticket into context at startup.</p>
+
+  <h2>The hook lifecycle</h2>
+  <p>A hook is a handler attached to an <strong>event</strong> in Claude Code's lifecycle. These are the ones you'll use most:</p>
+  <figure class="bleed">
+    <div class="diagram">
+      <svg viewBox="0 0 860 300" role="img" aria-label="Timeline of hook events: SessionStart, UserPromptSubmit, then a tool loop of PreToolUse, PermissionRequest, tool runs, PostToolUse, then Stop, and finally SessionEnd. Side events: Notification, SubagentStop, PreCompact.">
+        <defs><marker id="h1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker></defs>
+        <g font-size="12.5">
+          <rect x="10" y="40" width="110" height="46" rx="9" class="d-box"/><text x="65" y="68" text-anchor="middle" font-weight="600">SessionStart</text>
+          <rect x="145" y="40" width="140" height="46" rx="9" class="d-box"/><text x="215" y="68" text-anchor="middle" font-weight="600">UserPromptSubmit</text>
+          <rect x="310" y="20" width="400" height="140" rx="12" style="fill:none;stroke:var(--accent);stroke-dasharray:5 4"/>
+          <text x="510" y="40" text-anchor="middle" class="d-muted" font-size="11.5">tool loop: repeats for every tool call</text>
+          <rect x="325" y="56" width="100" height="46" rx="9" class="d-accent"/><text x="375" y="84" text-anchor="middle" font-weight="600">PreToolUse</text>
+          <rect x="440" y="56" width="125" height="46" rx="9" class="d-box"/><text x="502" y="84" text-anchor="middle" font-weight="600">PermissionRequest</text>
+          <rect x="580" y="56" width="115" height="46" rx="9" class="d-accent"/><text x="637" y="84" text-anchor="middle" font-weight="600">PostToolUse</text>
+          <text x="510" y="132" text-anchor="middle" class="d-muted" font-size="11.5">(tool runs between PermissionRequest and PostToolUse)</text>
+          <rect x="735" y="40" width="70" height="46" rx="9" class="d-accent"/><text x="770" y="68" text-anchor="middle" font-weight="600">Stop</text>
+          <rect x="690" y="210" width="120" height="46" rx="9" class="d-box"/><text x="750" y="238" text-anchor="middle" font-weight="600">SessionEnd</text>
+          <rect x="30" y="210" width="120" height="46" rx="9" class="d-box"/><text x="90" y="238" text-anchor="middle" font-weight="600">Notification</text>
+          <rect x="170" y="210" width="125" height="46" rx="9" class="d-box"/><text x="232" y="238" text-anchor="middle" font-weight="600">SubagentStop</text>
+          <rect x="315" y="210" width="115" height="46" rx="9" class="d-box"/><text x="372" y="238" text-anchor="middle" font-weight="600">PreCompact</text>
+          <text x="230" y="282" text-anchor="middle" class="d-muted" font-size="11.5">fire when they happen: needs input · a sub-agent finishes · context compacts</text>
+        </g>
+        <g class="d-line" stroke-width="1.4" marker-end="url(#h1)">
+          <path d="M120 63 L 142 63"/><path d="M285 63 L 322 75"/><path d="M425 79 L 437 79"/><path d="M565 79 L 577 79"/><path d="M695 79 L 732 66"/>
+          <path d="M770 88 L 760 207"/>
+          <path d="M770 40 C 770 0, 215 0, 215 37"/>
+        </g>
+        <text x="500" y="12" text-anchor="middle" class="d-muted" font-size="11.5">next prompt</text>
+        <text x="810" y="160" class="d-muted" font-size="11.5">exit</text>
+      </svg>
+    </div>
+    <figcaption>Orange boxes are where most guardrails live. There are more events than shown (for example PostToolUseFailure, SubagentStart, PostCompact, FileChanged); see the official hooks reference.</figcaption>
+  </figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Event</th><th>Fires when</th><th>Typical use</th></tr></thead>
+    <tbody>
+      <tr><td><code>SessionStart</code></td><td>Session starts, resumes, clears or compacts</td><td>Inject context: current branch, open ticket, recent failures</td></tr>
+      <tr><td><code>UserPromptSubmit</code></td><td>You submit a prompt, before Claude sees it</td><td>Add context, block prompts containing secrets</td></tr>
+      <tr><td><code>PreToolUse</code></td><td>Before any tool call runs</td><td><strong>Block</strong> dangerous commands, protect files, rewrite inputs</td></tr>
+      <tr><td><code>PermissionRequest</code></td><td>A permission prompt is about to be shown</td><td>Auto-approve or deny specific requests</td></tr>
+      <tr><td><code>PostToolUse</code></td><td>After a tool call succeeds</td><td>Format, lint, run related tests, log</td></tr>
+      <tr><td><code>Stop</code></td><td>Claude is about to end its turn</td><td><strong>Gate "done"</strong> on tests; this is what <code>/goal</code> uses</td></tr>
+      <tr><td><code>SubagentStop</code></td><td>A sub-agent finishes</td><td>Validate a sub-agent's output</td></tr>
+      <tr><td><code>PreCompact</code></td><td>Before context is compacted</td><td>Save a transcript or state snapshot</td></tr>
+      <tr><td><code>Notification</code></td><td>Claude needs your attention</td><td>Desktop or Slack notification</td></tr>
+      <tr><td><code>SessionEnd</code></td><td>Session ends</td><td>Cleanup, usage logging</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Anatomy of a hook</h2>
+  <p>Hooks live in settings files: <code>~/.claude/settings.json</code> (you, everywhere), <code>.claude/settings.json</code> (the project; commit it), or <code>.claude/settings.local.json</code> (you, this project; gitignore it). Plugins, skills and sub-agents can carry hooks too. The shape is always <strong>event → matcher group → handlers</strong>:</p>
+  <div class="code-file"><span>.claude/settings.json</span><span>json</span></div>
+<pre><code class="lang-json">{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
+
+  <h3>Matchers</h3>
+  <p>For tool events, the matcher filters on the tool name:</p>
+  <ul>
+    <li><code>"*"</code>, <code>""</code> or omitted: match everything.</li>
+    <li>Only letters, digits, <code>_</code>, <code>-</code> and <code>|</code>: an exact name or list, such as <code>"Bash"</code> or <code>"Edit|Write"</code>.</li>
+    <li>Anything else is treated as a JavaScript regex, such as <code>"mcp__github__.*"</code> for every tool from one MCP server.</li>
+  </ul>
+
+  <h3>Handler types</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>type</th><th>What runs</th><th>Use it for</th></tr></thead>
+    <tbody>
+      <tr><td><code>command</code></td><td>A shell command; event JSON on stdin</td><td>Almost everything. Start here.</td></tr>
+      <tr><td><code>http</code></td><td>A POST to a URL</td><td>Central policy services, audit logging</td></tr>
+      <tr><td><code>prompt</code></td><td>A small model judges the event (<code>$ARGUMENTS</code> holds the input JSON)</td><td>Fuzzy checks you can't express as a regex. <code>/goal</code> is one of these.</td></tr>
+      <tr><td><code>mcp_tool</code></td><td>A tool on an MCP server</td><td>Reuse an existing integration</td></tr>
+      <tr><td><code>agent</code></td><td>A sub-agent (experimental)</td><td>Checks that need to read files or run tools</td></tr>
+    </tbody>
+  </table></div>
+  <p>Use <code>$CLAUDE_PROJECT_DIR</code> in commands so they resolve to the project root regardless of where Claude's working directory has wandered. Quote it, because paths can contain spaces. Run <code>/hooks</code> to browse what's configured and where each hook came from. Set <code>"disableAllHooks": true</code> to switch them off without deleting anything.</p>
+
+  <h2>The contract: stdin, exit codes, JSON</h2>
+  <p>A command hook is a tiny program with a simple contract. It receives a JSON object on <strong>stdin</strong> describing the event:</p>
+<pre><code class="lang-json">{
+  "session_id": "abc123",
+  "transcript_path": "~/.claude/projects/my-app/abc123.jsonl",
+  "cwd": "/Users/me/my-app",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": { "command": "rm -rf build/", "description": "Clean build output" }
+}
+</code></pre>
+  <p>It communicates back through its <strong>exit code</strong>:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Exit code</th><th>Meaning</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>0</code></td><td>Success</td><td>Continue. If stdout is a single JSON object, it's parsed for decisions (below).</td></tr>
+      <tr><td><code>2</code></td><td>Blocking error</td><td>stderr is the reason. On events that can block (PreToolUse, UserPromptSubmit, Stop and others) the action is stopped and the reason goes to Claude. PostToolUse can't undo a tool that already ran.</td></tr>
+      <tr><td>anything else</td><td>Non-blocking error</td><td>Shown as a hook error; the action continues. <strong>A crashing hook does not block.</strong></td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><div class="callout-icon">⚠</div><div><div class="callout-title">Fail-open by default</div><p>Only exit code 2 blocks. If your guard script has a typo and exits 1, or <code>jq</code> isn't installed and it exits 127, the dangerous command goes through. Test guard hooks against the inputs they're meant to stop. The lab below exists for exactly that.</p></div></div>
+  <p>For finer control, exit 0 and print JSON. The fields you'll use most:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>Where</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>hookSpecificOutput.permissionDecision</code></td><td>PreToolUse</td><td><code>"allow"</code>, <code>"deny"</code>, <code>"ask"</code> or <code>"defer"</code>, with <code>permissionDecisionReason</code></td></tr>
+      <tr><td><code>hookSpecificOutput.additionalContext</code></td><td>Several events</td><td>Adds a string to Claude's context: a nudge, not a block</td></tr>
+      <tr><td><code>decision: "block"</code> + <code>reason</code></td><td>e.g. Stop, PostToolUse</td><td>Stop: Claude must keep working, and <code>reason</code> says why. PostToolUse: feedback to Claude.</td></tr>
+      <tr><td><code>continue: false</code> + <code>stopReason</code></td><td>Any</td><td>Halts Claude entirely</td></tr>
+      <tr><td><code>systemMessage</code></td><td>Any</td><td>A message shown to the user</td></tr>
+    </tbody>
+  </table></div>
+  <p><code>hookSpecificOutput</code> must include <code>hookEventName</code>:</p>
+<pre><code class="lang-json">{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Production database writes are not allowed"}}
+</code></pre>
+
+  <div data-widget="hook-lab"></div>
+
+  <h2>Five production recipes</h2>
+  <p>These are the hooks I'd put in nearly every repo. Each script reads stdin with <code>jq</code>, so install that first. Make the scripts executable (<code>chmod +x .claude/hooks/*.sh</code>) and commit them along with <code>.claude/settings.json</code> so the whole team gets them.</p>
+
+  <h3>1 · The command firewall (PreToolUse · Bash)</h3>
+  <div class="code-file"><span>.claude/hooks/block-dangerous.sh</span><span>bash</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# Block destructive or irreversible shell commands before they run.
+cmd="$(jq -r '.tool_input.command // empty')"
+
+deny=(
+  'rm +-(rf|fr) +(/|~|\$HOME)( |$)'      # rm -rf on root or home
+  'git +push.*(--force|-f( |$))'          # force push
+  'git +reset +--hard'                    # throws away work
+  'curl[^|]*\| *(ba)?sh'                  # pipe-to-shell installs
+  '(DROP|TRUNCATE) +(TABLE|DATABASE)'     # destructive SQL
+)
+for re in "${deny[@]}"; do
+  if grep -Eiq -- "$re" &lt;&lt;&lt;"$cmd"; then
+    echo "Blocked: '$cmd' matches a dangerous pattern ($re). Ask the user to run it manually if it's really intended." &gt;&amp;2
+    exit 2
+  fi
+done
+exit 0
+</code></pre>
+  <p>The stderr message is written for Claude, not you. It explains what happened and what to do next, so the agent adapts instead of retrying the same command three times.</p>
+
+  <h3>2 · Protect secrets and lockfiles (PreToolUse · Edit|Write)</h3>
+  <div class="code-file"><span>.claude/hooks/protect-files.sh</span><span>bash</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# Deny edits to secrets, lockfiles and git internals, with a structured reason.
+path="$(jq -r '.tool_input.file_path // empty')"
+case "$path" in
+  *.env|*.env.*|*/secrets/*|*package-lock.json|*pnpm-lock.yaml|*yarn.lock|*/.git/*)
+    jq -n --arg p "$path" '{
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: ("\($p) is protected. Lockfiles change via the package manager; secrets are edited by humans.")
+      }
+    }'
+    ;;
+esac
+exit 0
+</code></pre>
+  <div class="callout tip"><div class="callout-icon">💡</div><div><div class="callout-title">Hooks and permission rules work together</div><p>For simple cases, <code>"permissions": {"deny": ["Read(./.env)", "Edit(./.env)"]}</code> in settings.json does the job without a script. Reach for a hook when you need logic: patterns across many paths, exceptions, or a custom message.</p></div></div>
+
+  <h3>3 · Auto-format after every edit (PostToolUse · Edit|Write)</h3>
+  <div class="code-file"><span>.claude/hooks/format.sh</span><span>bash</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# Format the file Claude just touched. Never fail the turn over formatting.
+path="$(jq -r '.tool_input.file_path // empty')"
+case "$path" in
+  *.ts|*.tsx|*.js|*.jsx|*.json|*.css|*.md)
+    npx --no-install prettier --write "$path" &gt;/dev/null 2&gt;&amp;1 || true ;;
+  *.py)
+    ruff format "$path" &gt;/dev/null 2&gt;&amp;1 || true ;;
+  *.go)
+    gofmt -w "$path" &gt;/dev/null 2&gt;&amp;1 || true ;;
+esac
+exit 0
+</code></pre>
+  <p>Formatting in a hook means Claude never spends a turn on whitespace, and your diffs stay clean. It also means you can delete "always run prettier" from CLAUDE.md, which frees context for instructions only the model can follow.</p>
+
+  <h3>4 · The test gate (Stop)</h3>
+  <p>This is the hook version of <a href="04-goals-loops.html">lesson 4's</a> finish line, and stricter than <code>/goal</code>: the hook <em>runs</em> the tests itself instead of reading the transcript. If they fail, it returns <code>decision: "block"</code> and Claude has to keep working.</p>
+  <div class="code-file"><span>.claude/hooks/test-gate.sh</span><span>bash</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# Don't let Claude stop while the test suite is red, but give up after 3 tries
+# so a genuinely impossible task can't loop forever.
+input="$(cat)"
+session="$(jq -r '.session_id' &lt;&lt;&lt;"$input")"
+counter="${TMPDIR:-/tmp}/claude-test-gate-$session"
+
+# Only gate turns that changed code; skip if nothing is modified.
+if git -C "$CLAUDE_PROJECT_DIR" diff --quiet &amp;&amp; git -C "$CLAUDE_PROJECT_DIR" diff --cached --quiet; then
+  exit 0
+fi
+
+if output="$(cd "$CLAUDE_PROJECT_DIR" &amp;&amp; npm test --silent 2&gt;&amp;1)"; then
+  rm -f "$counter"; exit 0
+fi
+
+tries=$(( $(cat "$counter" 2&gt;/dev/null || echo 0) + 1 ))
+echo "$tries" &gt; "$counter"
+if [ "$tries" -gt 3 ]; then
+  rm -f "$counter"
+  jq -n '{systemMessage: "Test gate gave up after 3 attempts; tests are still failing."}'
+  exit 0
+fi
+
+jq -n --arg out "$(tail -n 30 &lt;&lt;&lt;"$output")" '{
+  decision: "block",
+  reason: ("Tests are failing. Fix them before finishing. Last output:\n" + $out)
+}'
+</code></pre>
+  <div class="callout danger"><div class="callout-icon">∞</div><div><div class="callout-title">Every Stop gate needs an escape hatch</div><p>A Stop hook that blocks unconditionally creates an infinite loop: Claude tries to stop, gets blocked, tries again, forever. The retry counter above is one escape hatch. Claude Code also sets <code>stop_hook_active: true</code> in the Stop hook's input when Claude is already continuing because of an earlier Stop-hook block. Check it with <code>jq -r '.stop_hook_active'</code> to let a second attempt through, and note that Claude Code caps this at 8 consecutive continuations anyway. Keep the test command fast, too. Gate on unit tests, not your 20-minute e2e suite.</p></div></div>
+
+  <h3>5 · Notify me when Claude needs input (Notification)</h3>
+  <div class="code-file"><span>.claude/hooks/notify.sh</span><span>bash</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# Desktop notification when Claude is waiting on you.
+msg="$(jq -r '.message // "Claude needs your attention"')"
+if command -v osascript &gt;/dev/null; then
+  osascript -e "display notification \"${msg//\"/\\\"}\" with title \"Claude Code\""
+elif command -v notify-send &gt;/dev/null; then
+  notify-send "Claude Code" "$msg"
+fi
+exit 0
+</code></pre>
+
+  <h3>Wiring all five together</h3>
+  <div class="code-file"><span>.claude/settings.json</span><span>json</span></div>
+<pre><code class="lang-json">{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-dangerous.sh" }] },
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.sh" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format.sh" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/test-gate.sh", "timeout": 300 }] }
+    ],
+    "Notification": [
+      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/notify.sh" }] }
+    ]
+  }
+}
+</code></pre>
+
+  <h2>Hooks are code you run with your permissions</h2>
+  <div class="callout danger"><div class="callout-icon">🔒</div><div><div class="callout-title">Review hooks like you review code, because they are code</div><p>Command hooks run automatically, as <em>you</em>, with your full user permissions, on every matching event. A hook in a project's <code>.claude/settings.json</code> runs when you open that project with Claude Code. Before trusting a repo you've cloned, read its <code>.claude/</code> directory. Use <code>/hooks</code> to see exactly what's active and where it came from.</p></div></div>
+  <p>Practical hygiene:</p>
+  <ul>
+    <li><strong>Quote every variable</strong> and use <code>jq</code> rather than string-splitting JSON. Tool inputs are model-generated text; treat them as untrusted input to your script.</li>
+    <li><strong>Keep hooks fast.</strong> A PreToolUse hook runs before every matching tool call; 500 ms on every <code>Bash</code> adds up.</li>
+    <li><strong>Fail safe where it matters.</strong> For a security guard, consider exiting 2 when the script can't parse its input, rather than failing open.</li>
+    <li><strong>Hooks aren't a sandbox.</strong> Pattern-matching shell commands is a strong speed bump, not a security boundary. Determined obfuscation can get past regexes. For real isolation, use Claude Code's sandboxing or a container.</li>
+  </ul>
+
+  <h2>Try it: hooks in a live session</h2>
+  <p>A scripted session with all five recipes installed. Ask Claude to do something dangerous, touch a secret, or ship a feature, and watch the hooks fire.</p>
+  <div id="term-hooks"></div>
+
+  <h2>Key takeaways</h2>
+  <ul>
+    <li><strong>Instructions are advisory; hooks are deterministic.</strong> Promote a rule to a hook the first time breaking it costs you.</li>
+    <li>Guardrails live on <strong>PreToolUse</strong> (block before) and <strong>Stop</strong> (gate "done"). Chores live on <strong>PostToolUse</strong>, <strong>SessionStart</strong> and <strong>Notification</strong>.</li>
+    <li>The contract: JSON on stdin; <strong>exit 2 blocks</strong> with stderr as the reason; exit 0 plus JSON gives fine-grained decisions. Other exit codes fail open.</li>
+    <li>Every Stop gate needs an <strong>escape hatch</strong> so it can't loop forever.</li>
+    <li>Hooks run as you. <strong>Read <code>.claude/</code> before trusting a repo</strong>, and check <code>/hooks</code>.</li>
+  </ul>
+
+  <div id="quiz"></div>
+</article>
+</main>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/widgets/hook-lab.js"></script>
+<script>
+TUTOR.ready(function () {
+  TUTOR.terminal("#term-hooks", {
+    title: "claude — ~/shop-web  (5 hooks active)",
+    hints: ["/hooks", "clean up everything with rm -rf ~", "turn on DEBUG in .env", "add a newsletter footer", "force push my branch"],
+    banner: [
+      ["sys", "✻ Claude Code (simulated) · cwd: ~/shop-web", 80],
+      ["sys", "  hooks: PreToolUse×2 · PostToolUse×1 · Stop×1 · Notification×1", 80]
+    ],
+    commands: [
+      { match: "/hooks", steps: [
+        ["sys", "Configured hooks (source: .claude/settings.json)"],
+        ["sys", "  PreToolUse    Bash        → .claude/hooks/block-dangerous.sh"],
+        ["sys", "  PreToolUse    Edit|Write  → .claude/hooks/protect-files.sh"],
+        ["sys", "  PostToolUse   Edit|Write  → .claude/hooks/format.sh"],
+        ["sys", "  Stop          *           → .claude/hooks/test-gate.sh (timeout 300s)"],
+        ["sys", "  Notification  *           → .claude/hooks/notify.sh"]
+      ]},
+      { match: /rm\s+-rf|clean ?up everything|delete everything/i, steps: [
+        ["tool", "Bash(rm -rf ~/shop-web/node_modules ~)"],
+        ["hook", "PreToolUse › block-dangerous.sh → exit 2"],
+        ["err", "  Blocked: matches a dangerous pattern (rm -rf on root or home). Ask the user to run it manually if it's really intended."],
+        ["claude", "That command was blocked because it would delete your home directory. I meant to clear build artifacts; here's the narrower version."],
+        ["tool", "Bash(rm -rf node_modules dist)"],
+        ["hook", "PreToolUse › block-dangerous.sh → exit 0"],
+        ["toolout", "removed node_modules, dist"],
+        ["claude", "Cleaned node_modules and dist only."]
+      ]},
+      { match: /force ?push|push --force|push -f/i, steps: [
+        ["tool", "Bash(git push --force origin feat/newsletter)"],
+        ["hook", "PreToolUse › block-dangerous.sh → exit 2"],
+        ["err", "  Blocked: 'git push --force …' matches a dangerous pattern."],
+        ["claude", "Force-push is blocked by a project hook. If you rebased intentionally, run `git push --force-with-lease` yourself. I won't work around the guard."],
+        ["hook", "Notification › notify.sh → 🔔 \"Claude needs your attention\""]
+      ]},
+      { match: /\.env|debug|secret/i, steps: [
+        ["tool", "Edit(.env)"],
+        ["hook", "PreToolUse › protect-files.sh → permissionDecision: deny"],
+        ["err", "  .env is protected. Lockfiles change via the package manager; secrets are edited by humans."],
+        ["claude", "I can't edit .env; it's protected by a project hook. To enable debug mode, add DEBUG=true to .env yourself, or I can read it from a non-secret config instead."]
+      ]},
+      { match: /footer|newsletter|feature|add /i, steps: [
+        ["tool", "Write(src/components/NewsletterFooter.tsx)"],
+        ["hook", "PreToolUse › protect-files.sh → exit 0"],
+        ["hook", "PostToolUse › format.sh → prettier --write ✓"],
+        ["tool", "Edit(src/App.tsx)"],
+        ["hook", "PostToolUse › format.sh → prettier --write ✓"],
+        ["claude", "Added the footer. I think we're done."],
+        ["hook", "Stop › test-gate.sh → npm test … ✗ 1 failed"],
+        ["hook", "  decision: block · \"Tests are failing. Fix them before finishing. App.test.tsx: unable to find role 'form'\""],
+        ["tool", "Read(src/App.test.tsx)"],
+        ["tool", "Edit(src/components/NewsletterFooter.tsx)"], ["toolout", "wrap inputs in <form aria-label=\"newsletter\">"],
+        ["hook", "PostToolUse › format.sh → prettier --write ✓"],
+        ["hook", "Stop › test-gate.sh → npm test … ✓ 48 passed"],
+        ["claude", "Footer added and the test gate is green (48/48). The first attempt broke an accessibility test; fixed by using a real <form>."]
+      ]}
+    ],
+    fallback: function () {
+      return [["claude", "This simulator scripts a few scenarios. Try a dangerous command, editing .env, or adding a feature to see each hook fire."]];
+    }
+  });
+
+  TUTOR.quiz("#quiz", { questions: [
+    { q: "Your PreToolUse guard script has a bug and exits with code 1 on a dangerous command. What happens?",
+      options: ["The command is blocked", "The command runs; only exit code 2 blocks", "Claude Code crashes", "The user is always asked"],
+      answer: 1, why: "Non-zero codes other than 2 are non-blocking errors. Guards fail open unless you test them, which is why the lab exists." },
+    { q: "Which event should you use to stop Claude from running `git push --force`?",
+      options: ["PostToolUse", "Stop", "PreToolUse", "SessionEnd"],
+      answer: 2, why: "PreToolUse runs before the tool call and can block it. PostToolUse is too late; the push already happened." },
+    { q: "What does the matcher \"Edit|Write\" match?",
+      options: ["A regex matching any tool containing Edit", "Exactly the Edit and Write tools", "All tools", "Only MCP tools"],
+      answer: 1, why: "A matcher made only of letters, digits, _, - and | is an exact name or list. Other characters make it a regex." },
+    { q: "Why does the test-gate Stop hook keep a retry counter?",
+      options: ["To save money on tests", "Without an escape hatch, a gate that always blocks loops forever on an impossible task", "Hooks require it", "To make tests faster"],
+      answer: 1, why: "A Stop hook returning decision: block sends Claude back to work. If the tests can never pass, you need a way out." },
+    { q: "You clone an unfamiliar repo and open Claude Code in it. What should you check first?",
+      options: ["The README", "Its .claude/ directory and /hooks, because project hooks run as you", "package.json", "Nothing; hooks are sandboxed"],
+      answer: 1, why: "Command hooks execute with your user permissions. Review project hooks before trusting them." }
+  ]});
+});
+</script>
+</body>
+</html>

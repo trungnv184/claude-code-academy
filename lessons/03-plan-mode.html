@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan Before You Code · Conducting Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-root=".." data-lesson="03">
+<main>
+<article class="article">
+  <div class="eyebrow">Lesson 3 · Plan mode</div>
+  <h1>Plan Before You Code</h1>
+  <p class="dek">The most expensive agent mistake isn't a bug. It's a well-tested solution to the wrong problem. Plan mode makes you and the agent agree on the approach while changing it still costs nothing.</p>
+  <div class="byline"><span>20 min read</span><span>1 lab</span><span>1 simulator</span><span>Quiz</span></div>
+
+  <div class="objectives">
+    <h4>By the end of this lesson you will</h4>
+    <ul>
+      <li>Run the explore → plan → code → commit workflow and know what each step protects you from</li>
+      <li>Enter plan mode four ways, and know exactly what it blocks and what it allows</li>
+      <li>Review and edit a plan before approving it, and pick the right approval option</li>
+      <li>Know when planning is overhead, and write plan prompts and specs that survive across sessions</li>
+    </ul>
+  </div>
+
+  <div data-toc></div>
+
+  <h2>The 400-line wrong turn</h2>
+  <p>You ask for Google sign-in. Claude installs Passport, writes a session layer, adds routes and a migration, and starts running tests. Then it discovers the app already uses NextAuth. It isn't stupid; it simply started acting before it finished gathering. By the time anyone notices, there's a 600-line diff, two-thirds of which is getting thrown away.</p>
+  <p>Agents are biased toward action. A model that sees a task and a set of edit tools will reach for the edit tools, because that looks like progress. In lesson 1's terms, the <em>gather</em> phase gets starved. Plan mode fixes this structurally: while it's on, Claude can read, search and think, but it <strong>cannot change your source files</strong> until you approve a plan.</p>
+  <div class="pull">A plan is the cheapest code review you will ever do. It's twenty lines long and nothing has been built yet.</div>
+
+  <h2>Explore → Plan → Code → Commit</h2>
+  <p>The workflow Anthropic recommends for anything non-trivial has four beats. Each one exists to catch a specific failure before it gets expensive.</p>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 760 210" role="img" aria-label="Diagram: four stages, Explore, Plan, Code and Commit, with a human review gate between Plan and Code">
+        <defs><marker id="p1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker></defs>
+        <g font-size="13">
+          <rect x="16" y="50" width="160" height="90" rx="12" class="d-box"/>
+          <text x="96" y="84" text-anchor="middle" font-weight="700" font-size="15">1 · Explore</text>
+          <text x="96" y="106" text-anchor="middle" class="d-muted" font-size="12">read, search, ask</text>
+          <text x="96" y="124" text-anchor="middle" class="d-muted" font-size="12">no edits</text>
+          <rect x="204" y="50" width="160" height="90" rx="12" class="d-accent"/>
+          <text x="284" y="84" text-anchor="middle" font-weight="700" font-size="15">2 · Plan</text>
+          <text x="284" y="106" text-anchor="middle" class="d-muted" font-size="12">steps, files, risks</text>
+          <text x="284" y="124" text-anchor="middle" class="d-muted" font-size="12">tests to add</text>
+          <rect x="412" y="50" width="160" height="90" rx="12" class="d-box"/>
+          <text x="492" y="84" text-anchor="middle" font-weight="700" font-size="15">3 · Code</text>
+          <text x="492" y="106" text-anchor="middle" class="d-muted" font-size="12">small steps</text>
+          <text x="492" y="124" text-anchor="middle" class="d-muted" font-size="12">verify each one</text>
+          <rect x="600" y="50" width="144" height="90" rx="12" class="d-box"/>
+          <text x="672" y="84" text-anchor="middle" font-weight="700" font-size="15">4 · Commit</text>
+          <text x="672" y="106" text-anchor="middle" class="d-muted" font-size="12">at green</text>
+          <text x="672" y="124" text-anchor="middle" class="d-muted" font-size="12">PR + summary</text>
+        </g>
+        <g class="d-line" stroke-width="1.5" marker-end="url(#p1)">
+          <path d="M176 95 L 201 95"/><path d="M364 95 L 409 95"/><path d="M572 95 L 597 95"/>
+        </g>
+        <line x1="388" y1="30" x2="388" y2="160" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4"/>
+        <text x="388" y="22" text-anchor="middle" font-size="12" font-weight="700" style="fill:var(--accent-ink)">YOU REVIEW HERE</text>
+        <text x="190" y="186" text-anchor="middle" class="d-muted" font-size="12">plan mode: read-only</text>
+        <text x="578" y="186" text-anchor="middle" class="d-muted" font-size="12">edits allowed after approval</text>
+      </svg>
+    </div>
+    <figcaption>The gate between Plan and Code is where a human adds the most value per minute in the whole loop.</figcaption>
+  </figure>
+  <ul>
+    <li><strong>Explore</strong> catches <em>wrong assumptions</em>: the existing auth library, the helper that already does this, the test setup.</li>
+    <li><strong>Plan</strong> catches <em>wrong approach</em>: the architecture choice, the order of steps, the risky bits nobody mentioned.</li>
+    <li><strong>Code</strong> in small, verified steps catches <em>wrong implementation</em> while each diff is still small.</li>
+    <li><strong>Commit at green</strong> gives you a rollback point and a reviewable history. Git is your real undo button.</li>
+  </ul>
+
+  <h2>Using plan mode</h2>
+  <h3>Four ways in</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>How</th><th>When to use it</th></tr></thead>
+    <tbody>
+      <tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd> (repeat until the status bar reads <em>plan mode on</em>)</td><td>Mid-session, before a bigger change</td></tr>
+      <tr><td><code>/plan</code> or <code>/plan add Google sign-in</code></td><td>Enter plan mode and give the task in one go</td></tr>
+      <tr><td><code>claude --permission-mode plan</code></td><td>Start a whole session read-only, e.g. to explore an unfamiliar repo</td></tr>
+      <tr><td><code>"defaultMode": "plan"</code> in <code>.claude/settings.json</code></td><td>Make planning the default for a repo where mistakes are costly</td></tr>
+    </tbody>
+  </table></div>
+  <p><kbd>Shift</kbd>+<kbd>Tab</kbd> cycles through the permission modes in order: <strong>default</strong> (ask before edits) → <strong>acceptEdits</strong> (auto-approve file edits) → <strong>plan</strong> → <strong>auto</strong> → back to default. If you've enabled <code>bypassPermissions</code> it appears in the cycle too, which is one more reason to leave it disabled on your daily machine.</p>
+<pre><code class="lang-json">{
+  "permissions": {
+    "defaultMode": "plan"
+  }
+}</code></pre>
+
+  <h3>What it blocks, what it allows</h3>
+  <p>In plan mode Claude can still read files, search, run read-only exploration, delegate research to the built-in <strong>Plan</strong> sub-agent, and ask you questions. What it can't do is modify your source. When it's ready, it presents a plan and waits for you.</p>
+
+  <h3>Reviewing and approving</h3>
+  <p>The plan isn't a formality. Read it like a design doc from a fast but new colleague. Press <kbd>Ctrl</kbd>+<kbd>G</kbd> to open the plan in your editor and change it directly: delete a step, reorder, add a constraint. When you're happy, you choose how execution proceeds:</p>
+  <ul>
+    <li><strong>Approve and run in auto mode</strong>, when the plan is solid and the change is low-risk.</li>
+    <li><strong>Approve with manual edit approval</strong>, when you want to watch each change land.</li>
+    <li><strong>Keep planning</strong>, and tell Claude what's wrong. This costs nothing at this stage.</li>
+  </ul>
+  <div class="callout tip"><div class="callout-icon">💡</div><div><div class="callout-title">What to look for in a plan</div><p>The <em>files</em> it will touch (surprises here are red flags). Whether it <em>reuses</em> existing helpers or invents new ones. Where <em>tests</em> come in: before or after the change? And what it says about <em>risk</em>: migrations, public APIs, data. If the plan doesn't mention verification, ask for it.</p></div></div>
+
+  <div data-widget="plan-sim"></div>
+
+  <h2>When to skip the plan</h2>
+  <p>Planning has a cost: a few extra turns and a few minutes of your attention. The lab's typo scenario makes the point. A useful rule of thumb from Anthropic's own guidance: <strong>if you could describe the diff in one sentence, skip the plan.</strong></p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Skip planning</th><th>Always plan</th></tr></thead>
+    <tbody>
+      <tr><td>Typo, rename, one-line fix</td><td>Touches 3+ files or crosses module boundaries</td></tr>
+      <tr><td>Adding a log line or a test for existing behavior</td><td>You're unsure how the current code works</td></tr>
+      <tr><td>The exact change is already in your head</td><td>Migrations, auth, payments, public APIs</td></tr>
+      <tr><td>Throwaway prototype on a branch</td><td>Anything you'll hand off to an unattended loop (lesson 4)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Writing a plan prompt that works</h2>
+  <p>A weak planning prompt ("plan the Google login") gets a generic plan. A strong one constrains the search space and tells Claude what you'll be judging:</p>
+  <div class="code-file"><span>prompt</span><span>template</span></div>
+<pre><code class="lang-md">Goal: let users sign in with Google.
+
+Context:
+- Read src/auth.ts and the accounts model before proposing anything.
+- We already use NextAuth; don't introduce a second auth library.
+
+Constraints:
+- No new DB columns if the accounts table can hold it.
+- Existing email/password users must be able to link Google later.
+
+Plan output:
+- Numbered steps, each small enough to verify on its own
+- Files touched per step
+- Tests to add (and whether they come before the change)
+- Risks and open questions you want me to answer
+</code></pre>
+  <p>The last block does the most work. You're specifying the <em>shape</em> of the plan, which makes it easier to review and harder for important parts like tests and risks to go missing.</p>
+
+  <h3>Give it room to think</h3>
+  <p>Planning is where extra reasoning pays off most. <code>/effort</code> sets how much effort the model spends per turn. Raise it for hard design questions, and drop it back down for mechanical work. Extended thinking can be toggled with <kbd>Option</kbd>+<kbd>T</kbd> (<kbd>Alt</kbd>+<kbd>T</kbd>). Or simply ask: "think through at least two approaches and compare them before choosing." Asking for alternatives is the cheapest way to avoid anchoring on the first idea.</p>
+
+  <h2>Plans that outlive the session</h2>
+  <p>A plan that only exists in the chat dies with <code>/clear</code>. For anything bigger than a single session, have Claude write it to a file and keep it updated:</p>
+<pre><code class="lang-bash"># after approving the plan
+&gt; Save this plan to specs/google-signin.md as a checklist.
+&gt; As you finish each step, tick it off and note any decision you made.
+</code></pre>
+  <p>Now the plan is reviewable in the PR, survives compaction, and any fresh session, or sub-agent, can pick up with "read specs/google-signin.md and do the next unchecked step." This is the foundation lesson 4's loops are built on.</p>
+
+  <h3>The interview technique</h3>
+  <p>For bigger features, flip the direction: have Claude interview <em>you</em> before it plans. It surfaces the questions you didn't think to answer, such as edge cases, permissions and migration strategy, and turns your answers into a spec.</p>
+<pre><code class="lang-md">I want to add team workspaces. Before planning anything, interview me.
+Ask one question at a time about requirements, edge cases, permissions
+and data migration. When you have enough, write a spec to
+specs/workspaces.md. Then start a fresh session to plan from that spec.
+</code></pre>
+  <div class="callout pro"><div class="callout-icon">🎼</div><div><div class="callout-title">Spec, then fresh session</div><p>Interviewing and planning fill the window with back-and-forth. Once the spec is on disk, <code>/clear</code> and plan from the file. The planning session starts from a clean, dense description instead of a long chat transcript.</p></div></div>
+
+  <h2>Try it: modes and planning</h2>
+  <p>Cycle modes with <code>shift+tab</code>, ask for an edit in plan mode, and approve a plan. Watch the mode line under each response.</p>
+  <div id="term-plan"></div>
+
+  <h2>Key takeaways</h2>
+  <ul>
+    <li>Agents lean toward action. <strong>Plan mode forces the gather phase</strong>: read and think, no source edits until you approve.</li>
+    <li>Use <strong>explore → plan → code → commit</strong>. Your review gate between plan and code is the highest-leverage minute in the loop.</li>
+    <li>Get in with <kbd>Shift</kbd>+<kbd>Tab</kbd>, <code>/plan</code>, <code>--permission-mode plan</code> or <code>defaultMode</code>. Edit plans with <kbd>Ctrl</kbd>+<kbd>G</kbd>.</li>
+    <li><strong>If you can describe the diff in one sentence, skip the plan.</strong></li>
+    <li>Ask for a plan with a defined shape (steps, files, tests, risks), and <strong>save it to a file</strong> so it outlives the session.</li>
+  </ul>
+
+  <div id="quiz"></div>
+</article>
+</main>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/widgets/plan-sim.js"></script>
+<script>
+TUTOR.ready(function () {
+  var MODES = [
+    { key: "default", line: "  ? for shortcuts · default mode (asks before edits)" },
+    { key: "acceptEdits", line: "  ⏵⏵ accept edits on (shift+tab to cycle)" },
+    { key: "plan", line: "  ⏸ plan mode on (shift+tab to cycle)" },
+    { key: "auto", line: "  ⏵⏵⏵ auto mode on (shift+tab to cycle)" }
+  ];
+  function mode(ctx) { return MODES[ctx.state.m || 0]; }
+  function setMode(ctx, key) { ctx.state.m = MODES.findIndex(function (x) { return x.key === key; }); }
+
+  TUTOR.terminal("#term-plan", {
+    title: "claude — ~/shop-web",
+    hints: ["shift+tab", "/plan add Google sign-in", "edit src/auth.ts to add Google", "approve", "keep planning: no new DB columns"],
+    banner: [
+      ["sys", "✻ Claude Code (simulated) · cwd: ~/shop-web", 80],
+      ["mode", MODES[0].line, 80]
+    ],
+    commands: [
+      { match: /^(shift\+?tab|\/mode)$/i, steps: function (input, ctx) {
+        ctx.state.m = ((ctx.state.m || 0) + 1) % MODES.length;
+        return [["mode", mode(ctx).line]];
+      }},
+      { match: /^\/plan\b/i, steps: function (input, ctx) {
+        setMode(ctx, "plan");
+        var task = input.replace(/^\/plan\s*/i, "") || "the task";
+        ctx.state.planned = true;
+        return [
+          ["mode", MODES[2].line],
+          ["tool", "Task(Plan) Research how auth works before planning: " + task],
+          ["toolout", "Read src/auth.ts, prisma/schema.prisma, tests/auth.spec.ts"],
+          ["toolout", "Found: NextAuth v5, JWT sessions, Account model with provider field"],
+          ["plan", "Plan · " + task],
+          ["plan", "1. Add GoogleProvider to src/auth.ts (reuse existing Account model)"],
+          ["plan", "2. Add GOOGLE_CLIENT_ID / SECRET to env schema + .env.example"],
+          ["plan", "3. Allow linking Google to existing email accounts (verified email only)"],
+          ["plan", "4. “Continue with Google” button on /login"],
+          ["plan", "5. Tests: provider config unit test + e2e login with mocked OAuth"],
+          ["plan", "Risks: account takeover via unverified email (handled in step 3)"],
+          ["claude", "Ready to code? Options: approve (auto) · approve (manual edits) · keep planning. Tip: Ctrl+G edits the plan in your editor."]
+        ];
+      }},
+      { match: /^(approve|yes|go|lgtm)\b/i, steps: function (input, ctx) {
+        if (!ctx.state.planned) return [["claude", "There's no plan to approve yet. Try /plan add Google sign-in."]];
+        setMode(ctx, input.toLowerCase().indexOf("manual") >= 0 ? "default" : "auto");
+        ctx.state.planned = false;
+        return [
+          ["mode", mode(ctx).line],
+          ["tool", "Edit(src/auth.ts)"], ["toolout", "+ GoogleProvider({ allowDangerousEmailAccountLinking: false })"],
+          ["tool", "Bash(pnpm test auth)"], ["toolout", "✓ 9 passed"],
+          ["tool", "Edit(app/login/page.tsx)"], ["toolout", "+ <GoogleButton />"],
+          ["tool", "Bash(pnpm typecheck && pnpm test)"], ["ok", "✓ 214 passed · 0 type errors"],
+          ["claude", "Steps 1–5 done, tests green. Want me to commit on a branch?"]
+        ];
+      }},
+      { match: /^keep planning/i, steps: function (input, ctx) {
+        if (!ctx.state.planned) return [["claude", "No plan in progress. Start one with /plan <task>."]];
+        var fb = input.replace(/^keep planning:?\s*/i, "");
+        return [
+          ["tool", "Read(prisma/schema.prisma)"],
+          ["plan", "Revised: " + (fb || "noted") + ". Step 1 now stores Google identity in Account (provider='google'); no schema change."],
+          ["claude", "Plan updated. Approve, or keep refining."]
+        ];
+      }},
+      { match: /\b(edit|change|add|fix|write|implement|refactor)\b/i, steps: function (input, ctx) {
+        if (mode(ctx).key === "plan") return [
+          ["tool", "Read(src/auth.ts)"],
+          ["err", "✗ Edit blocked: plan mode is read-only. Source changes wait for an approved plan."],
+          ["claude", "I've read the file. Want me to turn this into a plan? (/plan " + input.replace(/^(edit|change|add|fix|write|implement|refactor)\s*/i, "") + ")"]
+        ];
+        if (mode(ctx).key === "default") return [
+          ["tool", "Edit(src/auth.ts)"],
+          ["sys", "  Allow this edit? 1) Yes  2) Yes, and don't ask again this session  3) No (simulated: approved)"],
+          ["ok", "✓ Edited src/auth.ts"],
+          ["claude", "Done, but I skipped exploring first. For multi-file work, plan mode is safer: try shift+tab or /plan."]
+        ];
+        return [
+          ["tool", "Edit(src/auth.ts)"], ["ok", "✓ Edited src/auth.ts (" + mode(ctx).key + ": no prompt)"],
+          ["claude", "Edits are auto-approved in this mode. Fast, so make sure verification is in place."]
+        ];
+      }}
+    ],
+    fallback: function (input, ctx) {
+      return [["claude", "Simulator tip: type shift+tab to cycle modes, /plan <task> to plan, or ask for an edit while in plan mode."], ["mode", mode(ctx).line]];
+    }
+  });
+
+  TUTOR.quiz("#quiz", { questions: [
+    { q: "What does plan mode prevent?",
+      options: ["Reading files", "Running sub-agents", "Modifying source files until you approve a plan", "Asking you questions"],
+      answer: 2, why: "Plan mode keeps the agent in the gather/plan phase. It can read, search and ask, but changes wait for approval." },
+    { q: "Which task is the best candidate for skipping plan mode?",
+      options: ["Migrating date handling across 47 call sites", "Fixing a typo in one button label", "Adding OAuth to an app you haven't read", "Changing the billing database schema"],
+      answer: 1, why: "If you can describe the diff in one sentence, planning is overhead. The others carry real wrong-approach risk." },
+    { q: "Claude presents a plan, but you want to delete step 4 and reorder two steps. Fastest way?",
+      options: ["Reject and retype the whole task", "Ctrl+G to open the plan in your editor", "/clear and start over", "Approve and fix it in code review"],
+      answer: 1, why: "Ctrl+G opens the plan in your editor so you can edit it directly before approving." },
+    { q: "Why save an approved plan to specs/feature.md instead of leaving it in chat?",
+      options: ["Files load faster than chat", "It survives /clear, compaction and new sessions, and is reviewable in git", "Plan mode requires it", "It reduces API cost to zero"],
+      answer: 1, why: "State in files outlives the context window. A fresh session or sub-agent can pick it up with one instruction." },
+    { q: "You want every session in a risky legacy repo to start read-only. How?",
+      options: ["Add “please plan first” to your prompts", "Set \"defaultMode\": \"plan\" in .claude/settings.json", "Use /compact at the start", "Disable all tools"],
+      answer: 1, why: "defaultMode sets the starting permission mode for the project. You can also use claude --permission-mode plan per session." }
+  ]});
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sub-agents &amp; the Orchestra · Conducting Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-root=".." data-lesson="07">
+<main>
+<article class="article">
+  <div class="eyebrow">Lesson 7 · Delegation &amp; parallelism</div>
+  <h1>Sub-agents &amp; the Orchestra</h1>
+  <p class="dek">One agent with a perfect harness still has one context window and one pair of hands. Sub-agents give you more of both, but every extra agent also costs coordination. This lesson covers when the orchestra plays in tune, and when it's just noise.</p>
+  <div class="byline"><span>30 min read</span><span>1 lab</span><span>1 simulator</span><span>Quiz</span></div>
+
+  <div class="objectives">
+    <h4>By the end of this lesson you will</h4>
+    <ul>
+      <li>Explain the four reasons to delegate: context isolation, specialization, parallelism and tool restriction</li>
+      <li>Write sub-agent definitions in <code>.claude/agents/</code> and invoke them automatically, explicitly or by @-mention</li>
+      <li>Apply four proven patterns: fan-out research, writer/reviewer, test runner and parallel worktrees</li>
+      <li>Predict when adding agents <em>won't</em> help, using a dependency graph rather than optimism</li>
+    </ul>
+  </div>
+
+  <div data-toc></div>
+
+  <h2>Why one agent isn't enough</h2>
+  <p>Go back to the loop from lesson 1. Everything the agent touches (every file read, grep result and 2,000-line test log) lands in a single context window and stays there. For a 20-minute task, that's fine. For a feature that spans the API, the database, the UI and the docs, the window ends up holding four tasks' worth of debris, and the agent working on the docs is still paying attention to a stack trace from the migration.</p>
+  <p>A sub-agent is the fix. It's a separate Claude instance with its <strong>own context window</strong>, its own system prompt, and optionally its own tools and model. The main agent hands it a brief. It works, possibly reading dozens of files. Then it hands back a <em>summary</em>. Only the summary enters the main context.</p>
+  <div class="pull">The main reason to use a sub-agent is to keep your main context clean. Speed is a secondary benefit.</div>
+  <p>There are four distinct reasons to delegate, and it helps to know which one you're after:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Reason</th><th>What you get</th><th>Typical agent</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Context isolation</strong></td><td>Noisy exploration stays out of the main window; you get a 10-line answer, not 40 files</td><td>Explore, researcher</td></tr>
+      <tr><td><strong>Specialization</strong></td><td>A focused system prompt beats a general one; "you are a security auditor" changes what gets noticed</td><td>security-auditor, code-reviewer</td></tr>
+      <tr><td><strong>Parallelism</strong></td><td>Independent tasks run at the same time; wall-clock drops</td><td>Several general-purpose agents</td></tr>
+      <tr><td><strong>Tool restriction</strong></td><td>A reviewer that <em>can't</em> edit can't "fix" things silently; least privilege for agents</td><td>Read-only reviewer</td></tr>
+    </tbody>
+  </table></div>
+
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 760 300" role="img" aria-label="A lead agent with a small context delegates briefs to three sub-agents, each with its own large context, and receives short summaries back">
+        <defs><marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker></defs>
+        <rect x="290" y="20" width="180" height="78" rx="14" class="d-accent"/>
+        <text x="380" y="52" text-anchor="middle" font-weight="700" font-size="15">Lead agent</text>
+        <text x="380" y="74" text-anchor="middle" class="d-muted" font-size="12">main context: plan + summaries</text>
+        <g font-size="13">
+          <rect x="30" y="180" width="200" height="96" rx="12" class="d-box"/><text x="130" y="208" text-anchor="middle" font-weight="600">Explore · auth</text><text x="130" y="230" text-anchor="middle" class="d-muted" font-size="12">reads 31 files</text><text x="130" y="250" text-anchor="middle" class="d-muted" font-size="12">own window ~60k</text>
+          <rect x="280" y="180" width="200" height="96" rx="12" class="d-box"/><text x="380" y="208" text-anchor="middle" font-weight="600">test-runner</text><text x="380" y="230" text-anchor="middle" class="d-muted" font-size="12">swallows 4k-line log</text><text x="380" y="250" text-anchor="middle" class="d-muted" font-size="12">own window ~40k</text>
+          <rect x="530" y="180" width="200" height="96" rx="12" class="d-box"/><text x="630" y="208" text-anchor="middle" font-weight="600">code-reviewer</text><text x="630" y="230" text-anchor="middle" class="d-muted" font-size="12">read-only tools</text><text x="630" y="250" text-anchor="middle" class="d-muted" font-size="12">fresh eyes on the diff</text>
+        </g>
+        <g class="d-line" stroke-width="1.4" marker-end="url(#a7)">
+          <path d="M320 98 C 260 130, 160 140, 135 176"/><path d="M370 98 L 370 176"/><path d="M440 98 C 500 130, 600 140, 625 176"/>
+        </g>
+        <g stroke-width="1.4" fill="none" style="stroke:var(--accent)" stroke-dasharray="4 4" marker-end="url(#a7)">
+          <path d="M160 178 C 190 140, 270 120, 300 100"/><path d="M390 178 L 390 102"/><path d="M600 178 C 570 140, 490 120, 460 100"/>
+        </g>
+        <text x="215" y="132" class="d-muted" font-size="11.5">brief</text>
+        <text x="520" y="132" font-size="11.5" style="fill:var(--accent-ink)">summary (~10 lines)</text>
+      </svg>
+    </div>
+    <figcaption>Solid arrows carry a brief down; dashed arrows carry a short summary back. The 4,000-line test log never touches the lead's context.</figcaption>
+  </figure>
+
+  <h2>Built-in agents you already have</h2>
+  <p>You've been using sub-agents since lesson 1, maybe without noticing. Claude Code ships with several built-ins and delegates to them on its own:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Agent</th><th>Tools</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>Explore</code></td><td>Read-only</td><td>Fast codebase search and mapping: "where is X handled?"</td></tr>
+      <tr><td><code>Plan</code></td><td>Read-only</td><td>Research during plan mode, so planning doesn't bloat your context</td></tr>
+      <tr><td><code>general-purpose</code></td><td>All tools</td><td>Multi-step tasks that need to both read and act</td></tr>
+    </tbody>
+  </table></div>
+  <p>When the transcript shows a line like <code>Explore(…)</code> or <code>Task(…)</code>, that's delegation in progress. You don't need any configuration to benefit from it, but you can ask for it explicitly: "use an Explore agent to find every place we parse dates."</p>
+
+  <h2>Defining your own agents</h2>
+  <p>Custom agents are markdown files with YAML frontmatter. The body is the agent's system prompt. As with skills, location decides scope:</p>
+  <ul>
+    <li><code>.claude/agents/*.md</code>: project agents, shared with the team through git</li>
+    <li><code>~/.claude/agents/*.md</code>: your personal agents, available in every repo</li>
+    <li>Plugin <code>agents/</code> directories, plus a <code>--agents</code> CLI flag that takes JSON for one-off sessions</li>
+  </ul>
+  <p>The fastest way to create one is <code>/agents</code>, which opens an interactive manager that can generate a first draft for you to edit. Claude watches the agents directories, so most edits take effect without a restart. Identity comes from the <code>name</code> field, not the filename.</p>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>name</code> <span class="chip warn">required</span></td><td>The agent's identity, e.g. <code>code-reviewer</code></td></tr>
+      <tr><td><code>description</code> <span class="chip warn">required</span></td><td>When Claude should delegate to it. Like a skill description, this drives automatic invocation</td></tr>
+      <tr><td><code>tools</code> / <code>disallowedTools</code></td><td>Allowlist and denylist. Omit <code>tools</code> to inherit all tools</td></tr>
+      <tr><td><code>model</code></td><td><code>sonnet</code>, <code>opus</code>, <code>haiku</code>, a full model ID, or <code>inherit</code></td></tr>
+      <tr><td><code>permissionMode</code></td><td>Same modes as the main session, e.g. <code>plan</code> or <code>acceptEdits</code></td></tr>
+      <tr><td><code>maxTurns</code></td><td>A cap on the agent's loop, which is your circuit breaker</td></tr>
+      <tr><td><code>skills</code></td><td>Skills to preload into the agent's context</td></tr>
+      <tr><td><code>isolation: worktree</code></td><td>Runs the agent in a temporary git worktree, so its edits can't collide with yours</td></tr>
+      <tr><td><code>background</code></td><td><code>true</code> runs it in the background while you keep working</td></tr>
+      <tr><td><code>memory</code></td><td>Persistent memory scope for the agent: <code>user</code>, <code>project</code> or <code>local</code></td></tr>
+      <tr><td><code>color</code></td><td>Display color in the UI (red, blue, green, yellow, purple, orange, pink, cyan)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Three ways to invoke</h3>
+  <ol>
+    <li><strong>Automatic.</strong> Claude reads every agent's <code>description</code> and delegates when a task fits. Phrases like "Use proactively after code changes" in the description make this more likely.</li>
+    <li><strong>Natural language.</strong> "Use the code-reviewer agent to review my staged changes." This is explicit and predictable.</li>
+    <li><strong>@-mention.</strong> Type <code>@</code> and choose the agent, e.g. <code>@"code-reviewer (agent)"</code>. You can also run a whole session as an agent with <code>claude --agent code-reviewer</code>.</li>
+  </ol>
+
+  <h3>Nesting, concurrency and backgrounding</h3>
+  <p>Sub-agents can spawn their own sub-agents, up to a default depth limit of a few layers below the main conversation. You can turn nesting off with <code>CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1</code>. Many sub-agents can run concurrently. Press <kbd>Ctrl</kbd>+<kbd>B</kbd> to send a running task to the background and keep talking to the main agent while it works.</p>
+  <div class="callout warn"><div class="callout-icon">⚠</div><div><div class="callout-title">Depth is not a feature to max out</div><p>Every level of nesting is another hop where a brief can lose detail. Most real workflows need one level: a lead and its specialists. If you find yourself designing a three-level hierarchy, you probably want a written plan and several sessions instead.</p></div></div>
+
+  <h2>Four patterns that earn their keep</h2>
+
+  <h3>1. The fan-out researcher</h3>
+  <p>Before a cross-cutting change, send several Explore agents out in parallel, each with a narrow question: "how does auth issue tokens?", "where are sessions persisted?", "which UI components read the user?". Each one reads freely in its own window and returns a page. The lead then plans with three clean summaries instead of 90 raw files. This is the cheapest, safest parallelism there is, because nothing is being edited.</p>
+
+  <h3>2. Writer / reviewer: fresh eyes</h3>
+  <p>An agent reviewing its own code has the same blind spots it had while writing it. It remembers what it <em>meant</em>, so it reads intent where there's a bug. A reviewer sub-agent starts with a clean context and sees only the diff and the codebase. Give it read-only tools so that it reports rather than "fixes", and have the author address the findings. This is the single highest-value multi-agent pattern, and it costs one extra agent.</p>
+
+  <h3>3. The test runner</h3>
+  <p>Test output is the noisiest thing an agent reads. A dedicated test-runner agent runs the suite, reads the 4,000-line log, and returns "3 failures, here are the assertions and the likely cause." The main context gets the diagnosis without the log.</p>
+
+  <h3>4. Parallel sessions in worktrees</h3>
+  <p>When the tasks really are independent (two features, or a bug fix next to a refactor), you can run separate Claude sessions in separate git worktrees. Each gets its own checkout and branch, so the sessions can't trample each other's files:</p>
+<pre><code class="lang-bash"># each command opens a session in .claude/worktrees/&lt;name&gt; on branch worktree-&lt;name&gt;
+claude --worktree feature-sessions
+claude --worktree fix-coupon-tax     # in another terminal
+</code></pre>
+  <p>For sub-agents, <code>isolation: worktree</code> in the frontmatter gives you the same guarantee automatically. Either way, the merge is still yours. Parallel work moves the hard part to integration; it doesn't remove it.</p>
+
+  <h2>Conductor vs. orchestrator</h2>
+  <p>Addy Osmani's essay <a href="https://addyosmani.com/blog/code-agent-orchestra/" target="_blank" rel="noopener">"The Code Agent Orchestra"</a> gives the clearest framing I know for how the engineer's job changes here. Paraphrasing: as a <strong>conductor</strong>, you work with one agent in real time, guiding it turn by turn and keeping the whole piece in your head. As an <strong>orchestrator</strong>, you step back. You break work into well-specified parts, hand them to several agents running at once, and spend your time on specs, review and integration instead of on individual keystrokes.</p>
+  <p>The shift sounds like a promotion, and in a way it is, but it changes what you're good for. The orchestrator's leverage comes almost entirely from two skills: <strong>decomposition</strong> (cutting work along seams where agents won't collide) and <strong>verification</strong> (knowing quickly whether what came back is right). Without both, more agents just produce more plausible-looking diffs to untangle. Read the full essay; it's the natural next step after this lesson.</p>
+
+  <div data-widget="orchestra"></div>
+
+  <h2>When <em>not</em> to use more agents</h2>
+  <p>Multi-agent setups are fashionable, so the counter-arguments deserve the same weight. The lab shows each of them in numbers:</p>
+  <ul>
+    <li><strong>Dependencies cap your speed-up.</strong> If only three tasks can ever be ready at once, the fourth and fifth agents sit idle. Draw the dependency graph before you pick a team size.</li>
+    <li><strong>Every agent pays to load context.</strong> A fresh sub-agent has to re-read the files it needs. Five agents that each read the same module cost five times as much. Parallelism trades tokens for wall-clock time; that trade is only worth making when time is the bottleneck.</li>
+    <li><strong>Shared files mean merge conflicts.</strong> Two agents editing <code>session.ts</code> at the same time will produce a conflict or, worse, a clean merge that is semantically wrong. Assign file ownership, sequence the overlap, or isolate with worktrees.</li>
+    <li><strong>Tightly coupled work doesn't split.</strong> A refactor where every change depends on the last one is a single train of thought. Splitting it gives you several agents that each understand a third of the design.</li>
+    <li><strong>Briefs lose information.</strong> A sub-agent knows only what its brief says plus what it reads. Constraints you mentioned to the lead 40 turns ago don't arrive unless you put them in the brief, in CLAUDE.md, or in a file.</li>
+  </ul>
+  <div class="callout tip"><div class="callout-icon">💡</div><div><div class="callout-title">A good default</div><p>Start with one main agent, Explore for research, and a read-only reviewer at the end. Add parallel implementers only when you have a written plan with clear file ownership and the dependency graph actually allows it.</p></div></div>
+
+  <h2>Three agents worth stealing</h2>
+
+  <h3>1. A read-only code reviewer</h3>
+  <div class="code-file"><span>.claude/agents/code-reviewer.md</span><span>markdown</span></div>
+<pre><code class="lang-md">---
+name: code-reviewer
+description: Reviews a diff for bugs, missed edge cases and convention violations. Use proactively after implementing a feature or before committing.
+tools: Read, Grep, Glob, Bash(git diff *), Bash(git log *)
+model: sonnet
+color: orange
+---
+
+You are a senior reviewer seeing this change for the first time.
+
+1. Run `git diff` (or `git diff --staged` if asked) to get the change.
+2. For every changed function, read its callers. Bugs live at boundaries.
+3. Check: error handling, null/empty inputs, off-by-one, concurrency,
+   security (injection, authz), and the conventions in CLAUDE.md.
+4. Do NOT edit files. You report; the author fixes.
+
+Output, most severe first:
+- **file:line** — the problem, a concrete failing input, and the suggested fix.
+End with a one-line verdict: SHIP, SHIP WITH FIXES, or BLOCK.
+If you find nothing, say so plainly. Don't pad the list.
+</code></pre>
+
+  <h3>2. A test runner that swallows the noise</h3>
+  <div class="code-file"><span>.claude/agents/test-runner.md</span><span>markdown</span></div>
+<pre><code class="lang-md">---
+name: test-runner
+description: Runs the test suite and type checker and reports only the failures with likely causes. Use after code changes or when asked to run tests.
+tools: Read, Grep, Glob, Bash(pnpm test *), Bash(pnpm typecheck)
+model: haiku
+maxTurns: 15
+---
+
+Run `pnpm test` and `pnpm typecheck`.
+
+If everything passes, reply with a single line: "✓ N tests passed, 0 type errors."
+
+If anything fails, for each failure report:
+- test name and file:line
+- the assertion (expected vs received), max 5 lines
+- the most likely cause, after reading the code under test
+
+Never paste full logs. Never modify source or test files.
+</code></pre>
+
+  <h3>3. A security auditor</h3>
+  <div class="code-file"><span>.claude/agents/security-auditor.md</span><span>markdown</span></div>
+<pre><code class="lang-md">---
+name: security-auditor
+description: Audits code for security vulnerabilities — injection, auth/authz gaps, secrets, unsafe deserialization, SSRF. Use when changes touch auth, user input, file paths, external requests or secrets.
+tools: Read, Grep, Glob
+model: opus
+permissionMode: plan
+---
+
+You are an application security engineer. Assume every input is hostile.
+
+Check the changed code (and what it calls) for:
+- Injection: SQL, shell, path traversal, template, prototype pollution
+- AuthN/AuthZ: missing checks, IDOR, trusting client-supplied IDs or roles
+- Secrets: hardcoded keys, tokens in logs, .env contents leaking into output
+- External requests: SSRF, unvalidated redirects, missing timeouts
+- Data exposure: over-broad API responses, verbose error messages
+
+For each finding: severity (critical/high/medium/low), file:line, a concrete
+exploit scenario, and the fix. No theoretical findings without a code path.
+</code></pre>
+
+  <h2>Try it: delegation in a session</h2>
+  <p>A simulated session with the three agents above installed. Try managing agents, delegating a review, fanning out research, and starting a worktree.</p>
+  <div id="term-agents"></div>
+
+  <h2>Key takeaways</h2>
+  <ul>
+    <li>A sub-agent is a separate context window with its own prompt, tools and model. <strong>Its main value is keeping the main context clean.</strong></li>
+    <li>Delegate for one of four reasons: isolation, specialization, parallelism or tool restriction. Know which one you want.</li>
+    <li>Define agents in <code>.claude/agents/*.md</code> with a sharp <code>description</code>. Restrict tools to the minimum the role needs.</li>
+    <li>The highest-value pattern is the <strong>fresh-context reviewer</strong>. Fan-out research is the safest form of parallelism.</li>
+    <li>More agents give diminishing returns. Dependencies, context-loading cost, shared files and coupling all argue for fewer.</li>
+  </ul>
+
+  <div id="quiz"></div>
+</article>
+</main>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/widgets/orchestra.js"></script>
+<script>
+TUTOR.ready(function () {
+  TUTOR.terminal("#term-agents", {
+    title: "claude — ~/shop-api",
+    hints: ["/agents", "use the code-reviewer agent on my diff", "run 3 explore agents in parallel to map auth, sessions and the UI", "claude --worktree feature-sessions", "run the tests"],
+    banner: [
+      ["sys", "✻ Claude Code (simulated) · agents: code-reviewer, test-runner, security-auditor", 80]
+    ],
+    commands: [
+      { match: "/agents", steps: [
+        ["sys", "Agents"],
+        ["sys", "  Project (.claude/agents)"],
+        ["sys", "    code-reviewer      sonnet · Read, Grep, Glob, Bash(git diff *)…"],
+        ["sys", "    test-runner        haiku  · Read, Grep, Glob, Bash(pnpm test *)…"],
+        ["sys", "    security-auditor   opus   · Read, Grep, Glob · plan mode"],
+        ["sys", "  Built-in"],
+        ["sys", "    Explore · Plan · general-purpose"],
+        ["sys", "  ❯ Create new agent…   (generate a draft with Claude, then edit)"]
+      ]},
+      { match: /review/i, steps: [
+        ["agent", "⏺ code-reviewer (sonnet) — fresh context, read-only"],
+        ["tool", "Bash(git diff)"], ["toolout", "4 files changed, +186 −22"],
+        ["tool", "Read(src/services/session.ts)"], ["tool", "Grep(\"createSession\")"], ["toolout", "3 callers"],
+        ["toolout", "done · 19 tool uses · 41k tokens in its own window"],
+        ["claude", "Review summary from code-reviewer:\n  1. src/services/session.ts:58 — expired sessions are never deleted; `expiresAt < now` check is inverted. Input: any session older than 1h stays valid.\n  2. src/routes/sessions.ts:22 — missing zod validation on `deviceName` (unbounded string).\n  Verdict: SHIP WITH FIXES."],
+        ["sys", "  (only this summary — not the 41k tokens of reading — entered the main context)"]
+      ]},
+      { match: /parallel|fan.?out|explore agents/i, steps: [
+        ["agent", "⏺ Explore ×3 running in parallel"],
+        ["agent", "  ├─ Explore: how does auth issue and verify tokens?"],
+        ["agent", "  ├─ Explore: where are sessions persisted?"],
+        ["agent", "  └─ Explore: which UI components read the current user?"],
+        ["toolout", "auth ✓ (14 files) · sessions ✓ (9 files) · UI ✓ (17 files)"],
+        ["claude", "Map:\n  • Auth: JWT signed in src/auth/token.ts; verified by middleware/auth.ts.\n  • Sessions: none yet. Refresh tokens live in the users table (prisma/schema.prisma:41).\n  • UI: useCurrentUser() in 6 components; Login.tsx posts to /api/v1/login.\nSuggested seams: DB model → API → UI, with tests after the API and DB parts. Want a plan?"]
+      ]},
+      { match: /worktree/i, steps: [
+        ["sys", "$ claude --worktree feature-sessions"],
+        ["tool", "git worktree add .claude/worktrees/feature-sessions -b worktree-feature-sessions"],
+        ["toolout", "Preparing worktree (new branch 'worktree-feature-sessions')"],
+        ["ok", "New session in .claude/worktrees/feature-sessions — edits here can't collide with your main checkout."],
+        ["sys", "  Tip: run another `claude --worktree <name>` in a second terminal for a parallel task."]
+      ]},
+      { match: /test/i, steps: [
+        ["agent", "⏺ test-runner (haiku)"],
+        ["tool", "Bash(pnpm test)"], ["toolout", "4,212 lines of output (kept in the sub-agent's context)"],
+        ["tool", "Bash(pnpm typecheck)"],
+        ["claude", "test-runner: 2 failures.\n  • session.test.ts:31 — expected session to be expired, received valid. Likely cause: inverted comparison in session.ts:58.\n  • 0 type errors."]
+      ]},
+      { match: /security|audit/i, steps: [
+        ["agent", "⏺ security-auditor (opus) — plan mode, read-only"],
+        ["tool", "Grep(\"req\\.(body|query|params)\")"], ["tool", "Read(src/routes/sessions.ts)"],
+        ["claude", "1 high: DELETE /sessions/:id doesn't check that the session belongs to the caller (IDOR). Exploit: any logged-in user can revoke another user's sessions by ID. Fix: scope the query by req.user.id."]
+      ]}
+    ],
+    fallback: function () {
+      return [
+        ["claude", "(simulated) I'd handle this in the main context. Try /agents, asking for a review, running tests, fanning out explore agents, or a worktree."]
+      ];
+    }
+  });
+
+  TUTOR.quiz("#quiz", { questions: [
+    { q: "What's the main benefit of having a sub-agent explore 40 files instead of the main agent?",
+      options: ["Sub-agents use a smarter model", "Only the sub-agent's summary enters the main context", "Sub-agents can't make mistakes", "It's always cheaper in total tokens"],
+      answer: 1, why: "Context isolation. The reading happens in a separate window, and the lead gets a short summary. Total tokens may well go up." },
+    { q: "Why does a separate reviewer agent catch bugs the authoring agent missed?",
+      options: ["It has more tools", "It runs on a different machine", "It has a fresh context and no memory of what the code was meant to do", "Reviewers always use Opus"],
+      answer: 2, why: "The author reads intent into its own code. A clean context sees only what's actually there." },
+    { q: "Six subtasks, but the dependency graph never has more than three ready at once. What happens going from 3 to 5 parallel agents?",
+      options: ["Wall-clock halves", "Little or no speed-up, and more cost", "Merge conflicts disappear", "The tasks run sequentially"],
+      answer: 1, why: "Dependencies cap parallelism. Extra agents sit idle, and each spawned agent still pays to load its context." },
+    { q: "Two parallel agents both need to edit session.ts. Which is NOT a good mitigation?",
+      options: ["Assign file ownership so they never overlap", "Sequence the two tasks", "Run them in separate worktrees and merge deliberately", "Add more agents so it finishes faster"],
+      answer: 3, why: "More agents increase collision risk. Ownership, sequencing or worktree isolation address it." },
+    { q: "Which frontmatter makes a code-reviewer agent unable to modify files?",
+      options: ["model: haiku", "tools: Read, Grep, Glob", "color: red", "background: true"],
+      answer: 1, why: "A tools allowlist without Edit or Write (and without broad Bash) gives the role least privilege. A reviewer should report, not fix." }
+  ]});
+});
+</script>
+</body>
+</html>

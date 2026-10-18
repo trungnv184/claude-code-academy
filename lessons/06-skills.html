@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skills: Teach It Once · Conducting Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-root=".." data-lesson="06">
+<main>
+<article class="article">
+  <div class="eyebrow">Lesson 6 · Skills &amp; commands</div>
+  <h1>Skills: Teach It Once</h1>
+  <p class="dek">Every team has rituals the agent keeps getting slightly wrong: the release checklist, the API error format, the way migrations must be written. Skills turn that tribal knowledge into folders Claude loads exactly when it needs them — and ignores the rest of the time.</p>
+  <div class="byline"><span>20 min read</span><span>1 lab</span><span>1 simulator</span><span>Quiz</span></div>
+
+  <div class="objectives">
+    <h4>By the end of this lesson you will</h4>
+    <ul>
+      <li>Explain progressive disclosure and why it lets you install dozens of skills without bloating context</li>
+      <li>Write a <code>SKILL.md</code> with frontmatter that actually triggers when it should — and stays quiet when it shouldn't</li>
+      <li>Choose between a skill, CLAUDE.md, a hook and a sub-agent for any piece of know-how</li>
+      <li>Ship three production-ready skills: a scripted one, a user-only command, and a reference skill</li>
+    </ul>
+  </div>
+
+  <div data-toc></div>
+
+  <h2>The problem skills solve</h2>
+  <p>In lesson 2 you learned that <code>CLAUDE.md</code> is loaded into every session. That's its superpower and its curse. It's the right home for "we use pnpm" and "tests live next to the code." It's the wrong home for the 80-line procedure for cutting a release, which matters twice a month and costs context on every single turn in between.</p>
+  <p>So people do one of two things. They stuff CLAUDE.md until it becomes a 900-line wall the model skims. Or they keep the procedure in their head and re-type it — slightly differently each time — whenever it's needed. Both fail the same way: the agent either drowns in irrelevant instructions or never gets the relevant ones.</p>
+  <div class="pull">A skill is know-how with a trigger condition. It costs a sentence of context until the moment it's needed — then it costs whatever it needs to.</div>
+  <p>Concretely, a skill is a folder containing a <code>SKILL.md</code> file: YAML frontmatter that says <em>what</em> it is and <em>when</em> to use it, followed by a markdown playbook. The folder can also carry supporting files — reference docs, templates, scripts — that the playbook points to.</p>
+
+  <h2>Progressive disclosure: three levels of loading</h2>
+  <p>The design idea that makes skills work is borrowed from good UI: show the minimum up front, reveal detail on demand. Claude Code loads a skill in three stages.</p>
+
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 760 300" role="img" aria-label="Three levels of progressive disclosure: metadata always loaded, SKILL.md body loaded on use, supporting files and scripts loaded or executed when referenced">
+        <defs><marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker></defs>
+        <rect x="20" y="30" width="220" height="240" rx="14" class="d-accent"/>
+        <text x="130" y="62" text-anchor="middle" font-weight="700" font-size="15">Level 1 · always</text>
+        <text x="130" y="86" text-anchor="middle" class="d-muted" font-size="12.5">name + description</text>
+        <text x="130" y="104" text-anchor="middle" class="d-muted" font-size="12.5">of every skill</text>
+        <rect x="45" y="128" width="170" height="26" rx="6" class="d-box"/><text x="130" y="146" text-anchor="middle" font-size="12" font-family="var(--mono)">release-notes: Gen…</text>
+        <rect x="45" y="162" width="170" height="26" rx="6" class="d-box"/><text x="130" y="180" text-anchor="middle" font-size="12" font-family="var(--mono)">api-conventions: R…</text>
+        <rect x="45" y="196" width="170" height="26" rx="6" class="d-box"/><text x="130" y="214" text-anchor="middle" font-size="12" font-family="var(--mono)">db-migrations: Ho…</text>
+        <text x="130" y="252" text-anchor="middle" class="d-muted" font-size="12">~ a sentence each</text>
+
+        <rect x="270" y="30" width="220" height="240" rx="14" class="d-box"/>
+        <text x="380" y="62" text-anchor="middle" font-weight="700" font-size="15">Level 2 · on use</text>
+        <text x="380" y="86" text-anchor="middle" class="d-muted" font-size="12.5">SKILL.md body</text>
+        <text x="380" y="104" text-anchor="middle" class="d-muted" font-size="12.5">for the one skill chosen</text>
+        <rect x="295" y="128" width="170" height="94" rx="6" style="fill:var(--bg-elev);stroke:var(--rule)"/>
+        <text x="310" y="150" font-size="12" font-family="var(--mono)"># Release notes</text>
+        <text x="310" y="170" font-size="12" font-family="var(--mono)" class="d-muted">1. find last tag</text>
+        <text x="310" y="188" font-size="12" font-family="var(--mono)" class="d-muted">2. run script…</text>
+        <text x="310" y="206" font-size="12" font-family="var(--mono)" class="d-muted">3. group by type</text>
+        <text x="380" y="252" text-anchor="middle" class="d-muted" font-size="12">keep under ~500 lines</text>
+
+        <rect x="520" y="30" width="220" height="240" rx="14" class="d-box"/>
+        <text x="630" y="62" text-anchor="middle" font-weight="700" font-size="15">Level 3 · on reference</text>
+        <text x="630" y="86" text-anchor="middle" class="d-muted" font-size="12.5">supporting files</text>
+        <text x="630" y="104" text-anchor="middle" class="d-muted" font-size="12.5">read or executed as needed</text>
+        <text x="545" y="150" font-size="12" font-family="var(--mono)">reference/style.md</text>
+        <text x="545" y="174" font-size="12" font-family="var(--mono)">templates/notes.md</text>
+        <text x="545" y="198" font-size="12" font-family="var(--mono)">scripts/commits.sh</text>
+        <text x="545" y="216" font-size="11.5" class="d-muted">↳ runs; only output enters context</text>
+        <text x="630" y="252" text-anchor="middle" class="d-muted" font-size="12">effectively unbounded</text>
+
+        <g class="d-line" stroke-width="1.5" marker-end="url(#a6)"><path d="M240 150 L 268 150"/><path d="M490 150 L 518 150"/></g>
+      </svg>
+    </div>
+    <figcaption>You can install many skills because each one costs only its description until Claude decides it's relevant.</figcaption>
+  </figure>
+
+  <ol>
+    <li><strong>Metadata — always loaded.</strong> The <code>name</code> and <code>description</code> of every available skill sit in context so Claude knows what exists. This is why the description is the most important line you'll write.</li>
+    <li><strong>Body — loaded when used.</strong> When Claude decides a skill fits the task (or you invoke it with <code>/name</code>), the full SKILL.md body enters context.</li>
+    <li><strong>Supporting files — loaded when referenced.</strong> If the body says "see <code>reference/errors.md</code> for the error catalogue," that file is read only if the task needs it. Scripts in the folder are <em>executed</em>, not read — so a 300-line parser costs you only its output.</li>
+  </ol>
+  <div class="callout pro"><div class="callout-icon">◆</div><div><div class="callout-title">Scripts are the secret weapon</div><p>Deterministic work — parsing git logs, validating a schema, filling a PDF — is cheaper, faster and more reliable as code than as instructions. Put it in <code>scripts/</code>, tell the skill when to run it, and let the model do the judgment parts.</p></div></div>
+
+  <h2>Anatomy of a skill</h2>
+  <p>Skills live in a folder named after the skill. Where that folder lives decides who gets it:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Scope</th><th>Path</th><th>Use for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Project</strong></td><td><code>.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>Team know-how — commit it, everyone gets it</td></tr>
+      <tr><td><strong>Personal</strong></td><td><code>~/.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>Your own habits, across every repo</td></tr>
+      <tr><td><strong>Plugin</strong></td><td><code>&lt;plugin&gt;/skills/&lt;name&gt;/SKILL.md</code></td><td>Shared across teams; invoked as <code>/plugin-name:skill-name</code></td></tr>
+      <tr><td><strong>Enterprise</strong></td><td>managed settings directory</td><td>Org-wide policy and playbooks</td></tr>
+    </tbody>
+  </table></div>
+  <p>When names collide, enterprise beats personal, and personal beats project. A skill also wins over a legacy command file with the same name.</p>
+  <div class="code-file"><span>.claude/skills/release-notes/</span><span>folder layout</span></div>
+<pre><code class="lang-bash">release-notes/
+├── SKILL.md              # required: frontmatter + playbook
+├── templates/
+│   └── notes.md          # read when the body references it
+└── scripts/
+    └── commits.sh        # executed; only its output enters context
+</code></pre>
+
+  <h3>Frontmatter fields</h3>
+  <p>Every field is technically optional — <code>name</code> defaults to the folder name — but in practice you always want a sharp <code>description</code>. Field names must match exactly; unknown fields are silently ignored, so a typo like <code>allowed_tools</code> fails without a warning.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>name</code></td><td>The skill's identity and its slash command (<code>/name</code>). Defaults to the directory name.</td></tr>
+      <tr><td><code>description</code></td><td>What it does. Always in context; Claude uses it to decide when to load the skill.</td></tr>
+      <tr><td><code>when_to_use</code></td><td>Extra trigger text appended to the description. Keeps "what" and "when" readable.</td></tr>
+      <tr><td><code>argument-hint</code></td><td>Autocomplete hint shown in the <code>/</code> menu, e.g. <code>[issue-number]</code>.</td></tr>
+      <tr><td><code>disable-model-invocation</code></td><td><code>true</code> = only <em>you</em> can run it by typing <code>/name</code>. Use for anything with side effects.</td></tr>
+      <tr><td><code>user-invocable</code></td><td><code>false</code> hides it from the <code>/</code> menu — background knowledge only Claude pulls in.</td></tr>
+      <tr><td><code>allowed-tools</code></td><td>Tools pre-approved while the skill runs, so a trusted workflow doesn't stop for permission prompts.</td></tr>
+      <tr><td><code>context: fork</code></td><td>Runs the skill in a sub-agent with its own context window; only the result comes back.</td></tr>
+      <tr><td><code>model</code></td><td>Per-turn model override — e.g. a cheaper model for a mechanical skill.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Arguments and paths</h3>
+  <p>When you invoke a skill with arguments — <code>/fix-issue 1234</code> — the body can reference them. <code>$ARGUMENTS</code> expands to everything you typed after the name; <code>$0</code> (or <code>$ARGUMENTS[0]</code>) picks one by index. <code>${CLAUDE_SKILL_DIR}</code> expands to the skill's own folder, which is how a body reliably points at its bundled scripts no matter where the session's working directory is.</p>
+
+  <h3>Skills vs. slash commands</h3>
+  <p>If you've used Claude Code for a while, you may have <code>.claude/commands/deploy.md</code> files. They still work, and they create <code>/deploy</code> just like <code>.claude/skills/deploy/SKILL.md</code> does. The difference is that a skill is a folder — it can carry scripts and references — and it can be picked up automatically by Claude, not only typed by you. For anything new, write a skill. A "command" is now simply a skill you choose to invoke by hand.</p>
+
+  <h2>Writing descriptions that actually trigger</h2>
+  <p>Here's the uncomfortable truth: most skills that "don't work" are fine skills with bad descriptions. Claude never sees the beautiful playbook because nothing in the one-line description connected it to what the user asked.</p>
+  <p>A description has one job — to be matched against a request the skill author will never see. That means writing it in the vocabulary of the <em>request</em>, not the vocabulary of the solution. Three ingredients:</p>
+  <ul>
+    <li><strong>What</strong> it does, with concrete verbs: <em>generate, validate, fill, migrate</em>.</li>
+    <li><strong>When</strong> to use it: "Use when the user asks for…, mentions…, or is about to…".</li>
+    <li><strong>Keywords</strong> people actually type: file types, tool names, domain nouns. "PDF", "AcroForm", "changelog", "tag", "migration", "column".</li>
+  </ul>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Weak description</th><th>Strong description</th></tr></thead>
+    <tbody>
+      <tr><td>Helps with releases.</td><td>Generate release notes and a changelog entry from git commits between two tags. Use when the user asks what changed since a version, or is preparing a release.</td></tr>
+      <tr><td>Database utility.</td><td>How to write safe Prisma migrations: additive changes, backfills, zero-downtime column renames. Use when changing the schema or adding a column or table.</td></tr>
+      <tr><td>Our API standards.</td><td>REST conventions for this repo — route naming, error envelope, pagination, zod validation. Use when creating, changing or reviewing an HTTP endpoint.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The flip side matters too: a description that's too broad ("Use for any coding task") will load on everything and dilute the context it was meant to protect. Specific beats clever.</p>
+
+  <div data-widget="skill-lab"></div>
+
+  <h2>Skill, CLAUDE.md, hook or sub-agent?</h2>
+  <p>By now you have four places to put "how we do things here." They aren't interchangeable, and choosing wrong is the most common harness mistake. The test is two questions: <em>how often is this relevant</em>, and <em>does it need to be guaranteed</em>?</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Put it in…</th><th>When the know-how is…</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CLAUDE.md</strong></td><td>Relevant to almost every task; short</td><td>"Use pnpm. Run <code>pnpm test</code> before committing."</td></tr>
+      <tr><td><strong>Skill</strong></td><td>Relevant sometimes; a procedure or reference; may bundle scripts</td><td>The release checklist; the API error catalogue</td></tr>
+      <tr><td><strong>Hook</strong></td><td>Must happen (or never happen) every time, no exceptions</td><td>Block edits to <code>.env</code>; run prettier after every edit</td></tr>
+      <tr><td><strong>Sub-agent</strong></td><td>A role needing its own context, tools or model</td><td>A read-only reviewer; a test runner that swallows noisy logs</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><div class="callout-icon">⚠</div><div><div class="callout-title">Skills are advice, not enforcement</div><p>A skill's playbook is followed by the model, so it's subject to the same drift as any instruction. If a step is non-negotiable — "never deploy without tests passing" — back the skill with a hook (lesson 5) rather than writing it in capital letters.</p></div></div>
+
+  <h2>Three skills worth stealing</h2>
+  <p>Each of these demonstrates a different shape. Copy them, then edit until they describe your repo rather than mine.</p>
+
+  <h3>1. A scripted skill: release notes</h3>
+  <p>The judgment (what's user-facing, how to phrase it) belongs to the model; the mechanics (which commits, which PRs) belong to a script.</p>
+  <div class="code-file"><span>.claude/skills/release-notes/SKILL.md</span><span>markdown</span></div>
+<pre><code class="lang-md">---
+name: release-notes
+description: Generate release notes and a CHANGELOG.md entry from git commits between two tags. Groups changes into features, fixes and breaking changes.
+when_to_use: Use when the user asks for release notes, a changelog, what changed since a version, or is preparing a release or tag.
+argument-hint: [from-tag] [to-ref]
+allowed-tools: Bash(git log *), Bash(git describe *), Read, Edit
+---
+
+# Release notes
+
+1. Collect commits:
+   `bash ${CLAUDE_SKILL_DIR}/scripts/commits.sh $0 $1`
+   (defaults: last tag → HEAD). The script prints one line per commit:
+   `type|scope|subject|pr-number`.
+2. Drop chore/ci/test commits unless they change user-visible behavior.
+3. Group into **Breaking**, **Features**, **Fixes**. Breaking first, always.
+4. Rewrite each subject for users, not developers: say what changed for them.
+5. Fill `${CLAUDE_SKILL_DIR}/templates/notes.md` and prepend it to CHANGELOG.md.
+6. Show me the entry before committing anything.
+
+## Gotchas
+- A commit with `!` after the type (e.g. `feat!:`) is breaking even without a footer.
+- Squash-merged PRs: use the PR title, not the individual commits.
+</code></pre>
+  <div class="code-file"><span>.claude/skills/release-notes/scripts/commits.sh</span><span>bash</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# Print conventional commits between two refs as: type|scope|subject|pr
+set -euo pipefail
+FROM="${1:-$(git describe --tags --abbrev=0)}"
+TO="${2:-HEAD}"
+git log "$FROM..$TO" --no-merges --pretty=format:'%s' |
+  sed -E 's/^([a-z]+)(\(([^)]*)\))?(!)?: (.*)$/\1\4|\3|\5/' |
+  sed -E 's/^(.*)\(#([0-9]+)\)$/\1|\2/'
+</code></pre>
+
+  <h3>2. A user-only command: fix an issue</h3>
+  <p>This one has side effects — it creates branches and opens PRs — so <code>disable-model-invocation: true</code> means Claude can never decide to run it on its own. You type <code>/fix-issue 1234</code>; it does the rest.</p>
+  <div class="code-file"><span>.claude/skills/fix-issue/SKILL.md</span><span>markdown</span></div>
+<pre><code class="lang-md">---
+name: fix-issue
+description: Fix a GitHub issue end to end — reproduce, test, fix, open a PR.
+argument-hint: [issue-number]
+disable-model-invocation: true
+---
+
+Fix GitHub issue #$ARGUMENTS.
+
+1. `gh issue view $ARGUMENTS` — read the issue and every comment.
+2. Find the relevant code. Summarize the root cause in 2–3 sentences before editing.
+3. Write a failing test that reproduces the bug. Run it; confirm it fails.
+4. Make the smallest fix that turns it green. Run the full suite and the type check.
+5. Create branch `fix/$ARGUMENTS-&lt;short-slug&gt;`, commit with `fix: … (closes #$ARGUMENTS)`.
+6. `gh pr create` with: root cause, the fix, how it was verified.
+
+If you cannot reproduce the bug, stop and tell me what you tried. Do not guess-fix.
+</code></pre>
+
+  <h3>3. A reference skill: API conventions</h3>
+  <p>No steps at all — just knowledge, loaded only when someone touches an endpoint. The heavy catalogue lives in a separate file so even the body stays small.</p>
+  <div class="code-file"><span>.claude/skills/api-conventions/SKILL.md</span><span>markdown</span></div>
+<pre><code class="lang-md">---
+name: api-conventions
+description: REST API conventions for this repo — route naming, error envelope, pagination, zod validation and status codes.
+when_to_use: Use when creating, changing or reviewing an HTTP endpoint, route, controller or API response.
+user-invocable: false
+---
+
+# API conventions
+
+- Routes: plural nouns, kebab-case: `/api/v1/order-items/:id`. No verbs in paths.
+- Validate every body and query with zod in `src/schemas/`; never trust `req.body` directly.
+- Errors always use the envelope:
+  `{ "error": { "code": "ORDER_NOT_FOUND", "message": "…", "details": {} } }`
+- Pagination: cursor-based. `?cursor=&lt;opaque&gt;&amp;limit=50` (max 200).
+  Response includes `nextCursor` (null on the last page).
+- Status codes: 201 create, 204 delete, 409 conflict, 422 validation. Never 200 for errors.
+
+Full error-code catalogue: see `reference/error-codes.md` (read it only when adding a new code).
+</code></pre>
+
+  <h2>Try it: skills in a session</h2>
+  <p>A simulated session with the three skills above installed. Notice when a skill loads automatically, when it only runs because you typed its name, and what happens when nothing matches.</p>
+  <div id="term-skills"></div>
+
+  <h2>Sharing skills: plugins</h2>
+  <p>Checking <code>.claude/skills/</code> into the repo shares skills with everyone who works on that repo. To share across repos and teams, package skills — together with agents, hooks and MCP servers — as a <strong>plugin</strong>. Run <code>/plugin</code> to browse and install from marketplaces, or install from the shell:</p>
+<pre><code class="lang-bash"># install a plugin from a marketplace
+claude plugin install code-review@claude-plugins-official
+</code></pre>
+  <p>Plugin skills are namespaced — <code>/plugin-name:skill-name</code> — so two plugins can both ship a <code>review</code> skill without colliding.</p>
+  <div class="callout tip"><div class="callout-icon">💡</div><div><div class="callout-title">Grow skills from real sessions</div><p>The best skills aren't designed up front. When you notice you've explained the same procedure to Claude for the third time, ask it: "Turn what we just did into a skill in <code>.claude/skills/</code>." Then edit the result. The session is the first draft.</p></div></div>
+
+  <h2>Key takeaways</h2>
+  <ul>
+    <li>A skill is <strong>know-how with a trigger</strong>: a folder with a <code>SKILL.md</code>, optionally carrying references and scripts.</li>
+    <li><strong>Progressive disclosure</strong> keeps it cheap — only name and description load until the skill is used; files load when referenced; scripts run and return output.</li>
+    <li>The <strong>description is the whole ballgame</strong>. Write what + when + the keywords users actually type.</li>
+    <li>Use <code>disable-model-invocation: true</code> for anything with side effects; <code>user-invocable: false</code> for background knowledge.</li>
+    <li>Pick the right home: CLAUDE.md for always, skills for sometimes, hooks for must, sub-agents for separate roles.</li>
+  </ul>
+
+  <div id="quiz"></div>
+</article>
+</main>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/widgets/skill-lab.js"></script>
+<script>
+TUTOR.ready(function () {
+  TUTOR.terminal("#term-skills", {
+    title: "claude — ~/shop-api",
+    hints: ["write release notes for v2.4.0", "add a GET /api/v1/invoices endpoint", "/fix-issue 1234", "fix issue 1234 for me", "what time is it in Tokyo?"],
+    banner: [
+      ["sys", "✻ Claude Code (simulated) · skills: release-notes, fix-issue, api-conventions", 80],
+      ["sys", "  Only each skill's name + description is in context right now.", 80]
+    ],
+    commands: [
+      { match: /release|changelog|what changed/i, steps: [
+        ["sys", "  ⚡ skill matched by description → loading release-notes/SKILL.md"],
+        ["tool", "Bash(bash .claude/skills/release-notes/scripts/commits.sh v2.3.0 HEAD)"],
+        ["toolout", "feat|orders|add bulk export|412\nfix|auth|refresh token race|418\nfeat!|api|drop v0 routes|420\nchore|ci|bump node|421"],
+        ["sys", "  (script ran — only its 4 lines of output entered context, not the script)"],
+        ["tool", "Read(.claude/skills/release-notes/templates/notes.md)"],
+        ["claude", "Draft for v2.4.0:\n  ⚠ Breaking — v0 API routes removed (#420)\n  ✨ Features — bulk export for orders (#412)\n  🐛 Fixes — no more random logouts when tokens refresh (#418)\nI skipped the CI chore. Want me to prepend this to CHANGELOG.md?"]
+      ]},
+      { match: /endpoint|route|api\/v1|controller/i, steps: [
+        ["sys", "  ⚡ skill matched by description → loading api-conventions/SKILL.md"],
+        ["tool", "Read(src/routes/orders.ts)"], ["toolout", "existing pattern: router + zod schema + service"],
+        ["tool", "Write(src/schemas/invoices.ts)"],
+        ["tool", "Write(src/routes/invoices.ts)"],
+        ["toolout", "GET /api/v1/invoices?cursor=&limit=50 → { data, nextCursor }"],
+        ["tool", "Bash(pnpm test invoices)"], ["toolout", "✓ 6 passed"],
+        ["claude", "Added GET /api/v1/invoices with cursor pagination (max 200), zod-validated query, and the standard error envelope — per api-conventions."]
+      ]},
+      { match: /^\/fix-issue/i, steps: function (input) {
+        var n = (input.match(/\d+/) || ["1234"])[0];
+        return [
+          ["sys", "  /fix-issue invoked by you → $ARGUMENTS = " + n],
+          ["tool", "Bash(gh issue view " + n + ")"], ["toolout", "#" + n + " Cart total wrong with percentage coupons"],
+          ["tool", "Grep(\"coupon\")"], ["toolout", "src/cart/total.ts"],
+          ["claude", "Root cause: percentage coupons are applied after tax instead of before."],
+          ["tool", "Edit(src/cart/total.test.ts)"], ["tool", "Bash(pnpm test total)"], ["toolout", "✗ 1 failed — reproduced"],
+          ["tool", "Edit(src/cart/total.ts)"], ["tool", "Bash(pnpm test && pnpm typecheck)"], ["toolout", "✓ 214 passed · 0 type errors"],
+          ["tool", "Bash(gh pr create --title \"fix: apply coupons pre-tax (closes #" + n + ")\")"],
+          ["ok", "PR opened."]
+        ];
+      }},
+      { match: /fix issue|issue \d+/i, steps: [
+        ["sys", "  fix-issue has disable-model-invocation: true — Claude may not run it on its own."],
+        ["claude", "I can look into issue 1234 manually, or you can run /fix-issue 1234 to use the team's full reproduce → test → fix → PR workflow. Which would you like?"]
+      ]}
+    ],
+    fallback: function () {
+      return [
+        ["sys", "  no skill description matches this request — nothing extra loaded"],
+        ["claude", "(simulated) I'd answer this from general knowledge and CLAUDE.md alone. Try asking for release notes, a new endpoint, or /fix-issue 1234."]
+      ];
+    }
+  });
+
+  TUTOR.quiz("#quiz", { questions: [
+    { q: "You have 30 skills installed. What is in Claude's context before any of them is used?",
+      options: ["All 30 SKILL.md files in full", "Only the name and description of each skill", "Nothing — skills load only via /name", "Only the skills in ~/.claude/skills"],
+      answer: 1, why: "Progressive disclosure: metadata is always present so Claude knows what exists; bodies load on use, supporting files when referenced." },
+    { q: "Your skill has a great playbook but Claude never uses it unless you type /name. The most likely cause?",
+      options: ["The body is too long", "The description doesn't share vocabulary or trigger context with real requests", "Skills only work in plan mode", "It's missing allowed-tools"],
+      answer: 1, why: "Claude chooses skills from their descriptions. Write what + when + the keywords users actually type. (Also check you didn't set disable-model-invocation.)" },
+    { q: "A skill deploys to production. Which frontmatter field should it have?",
+      options: ["user-invocable: false", "context: fork", "disable-model-invocation: true", "model: haiku"],
+      answer: 2, why: "Side-effecting workflows should only run when a human types the command. disable-model-invocation: true prevents Claude from triggering it automatically." },
+    { q: "Where does \"never edit files under migrations/applied/\" belong?",
+      options: ["A skill", "CLAUDE.md only", "A PreToolUse hook (optionally mentioned in CLAUDE.md too)", "A sub-agent's description"],
+      answer: 2, why: "It must hold every time, so it needs deterministic enforcement. Skills and CLAUDE.md are advice the model may drift from." },
+    { q: "Why put log-parsing logic in scripts/ instead of describing it in SKILL.md?",
+      options: ["Scripts are loaded into context faster", "Scripts are executed, so only their output costs context — and code is deterministic", "SKILL.md can't contain code blocks", "It's required for plugins"],
+      answer: 1, why: "Deterministic mechanics belong in code: cheaper in tokens, reliable every run, and the model keeps the judgment calls." }
+  ]});
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conducting Claude</title>
+<meta name="description" content="A free, hands-on course on agentic engineering with Claude Code: the agent loop, CLAUDE.md, plan mode, goals and loops, hooks, skills, and sub-agent orchestration — with interactive labs you can run in the browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-root="." data-page="home">
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">A free course on agentic engineering</div>
+    <h1>Stop typing code.<br>Start <em>conducting</em> it.</h1>
+    <p class="lead">Claude Code can read your repo, run your tests and ship a feature while you review the diff. What separates a frustrating afternoon from a 10× week isn't the model — it's the <strong>harness</strong> you build around it: context, plans, goals, loops, hooks, skills and sub-agents. This course teaches all seven, hands-on.</p>
+    <div class="btn-row">
+      <a class="btn primary" href="lessons/01-agent-loop.html">Start lesson 1 →</a>
+      <a class="btn" href="playground.html">Try the playground</a>
+    </div>
+    <div class="hero-stats">
+      <div><strong>9</strong>lessons</div>
+      <div><strong>12+</strong>interactive labs</div>
+      <div><strong>1</strong>capstone project</div>
+      <div><strong>~4h</strong>end to end</div>
+    </div>
+  </div>
+  <div id="hero-term"></div>
+</section>
+
+<section class="section">
+  <div class="pillars">
+    <div class="pillar"><h3>Essay-first</h3><p>Each lesson is a long-form explainer: why a technique exists, when it breaks, and the opinions practitioners have earned the hard way.</p></div>
+    <div class="pillar"><h3>Labs in the browser</h3><p>Simulated terminals, hook testers, skill matchers and an orchestration timeline. Nothing to install — click, type, and watch the agent react.</p></div>
+    <div class="pillar"><h3>Copy-paste ready</h3><p>Every config, hook script, SKILL.md and agent definition is real and ready to drop into your <code>.claude/</code> folder.</p></div>
+  </div>
+</section>
+
+<section class="section" id="curriculum">
+  <h2 class="section-title">Curriculum</h2>
+  <p class="section-sub">Go in order the first time — each lesson adds one layer to the harness. The capstone uses all of them together to build a real project.</p>
+  <div class="cards" id="cards"></div>
+</section>
+
+<section class="section">
+  <h2 class="section-title">The harness, in one picture</h2>
+  <p class="section-sub">The model is the engine. Everything else in this course is the vehicle around it.</p>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 860 330" role="img" aria-label="Diagram: the agent loop at the center, surrounded by six harness layers">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color:var(--ink-3)"/></marker></defs>
+        <rect x="320" y="110" width="220" height="110" rx="14" class="d-accent" stroke-width="1.5"/>
+        <text x="430" y="150" text-anchor="middle" font-weight="700" font-size="17">The agent loop</text>
+        <text x="430" y="174" text-anchor="middle" class="d-muted" font-size="13">gather → act → verify</text>
+        <text x="430" y="196" text-anchor="middle" class="d-muted" font-size="13">(repeat until done)</text>
+        <g font-size="14">
+          <rect x="30" y="30" width="220" height="62" rx="10" class="d-box"/><text x="140" y="56" text-anchor="middle" font-weight="600">CLAUDE.md · context</text><text x="140" y="76" text-anchor="middle" class="d-muted" font-size="12">what it knows</text>
+          <rect x="30" y="134" width="220" height="62" rx="10" class="d-box"/><text x="140" y="160" text-anchor="middle" font-weight="600">Plan mode</text><text x="140" y="180" text-anchor="middle" class="d-muted" font-size="12">what it intends</text>
+          <rect x="30" y="238" width="220" height="62" rx="10" class="d-box"/><text x="140" y="264" text-anchor="middle" font-weight="600">Goals &amp; loops</text><text x="140" y="284" text-anchor="middle" class="d-muted" font-size="12">when it may stop</text>
+          <rect x="610" y="30" width="220" height="62" rx="10" class="d-box"/><text x="720" y="56" text-anchor="middle" font-weight="600">Hooks</text><text x="720" y="76" text-anchor="middle" class="d-muted" font-size="12">what it must / must not do</text>
+          <rect x="610" y="134" width="220" height="62" rx="10" class="d-box"/><text x="720" y="160" text-anchor="middle" font-weight="600">Skills</text><text x="720" y="180" text-anchor="middle" class="d-muted" font-size="12">how it does recurring work</text>
+          <rect x="610" y="238" width="220" height="62" rx="10" class="d-box"/><text x="720" y="264" text-anchor="middle" font-weight="600">Sub-agents</text><text x="720" y="284" text-anchor="middle" class="d-muted" font-size="12">who else does the work</text>
+        </g>
+        <g class="d-line" stroke-width="1.4" marker-end="url(#ah)">
+          <path d="M250 61 C 290 61, 300 120, 320 135"/><path d="M250 165 L 318 165"/><path d="M250 269 C 290 269, 300 210, 320 197"/>
+          <path d="M610 61 C 570 61, 560 120, 540 135"/><path d="M610 165 L 542 165"/><path d="M610 269 C 570 269, 560 210, 540 197"/>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Six layers you control. Lessons 2–7 cover one each; lesson 8 composes them.</figcaption>
+  </figure>
+</section>
+
+<section class="section">
+  <h2 class="section-title">Who this is for</h2>
+  <div class="cards">
+    <div class="card" style="cursor:default"><h3>Developers new to agents</h3><p>You've used autocomplete or chat. You want to delegate whole tasks without babysitting every keystroke.</p></div>
+    <div class="card" style="cursor:default"><h3>Claude Code users who plateaued</h3><p>It works, sometimes. You want repeatable results: fewer "it said tests pass but they don't" moments.</p></div>
+    <div class="card" style="cursor:default"><h3>Tech leads</h3><p>You want team-wide conventions — shared hooks, skills and agents checked into the repo — not 12 personal prompt styles.</p></div>
+  </div>
+</section>
+
+<footer class="site-foot">
+  Conducting Claude — an independent, community learning resource. Not affiliated with Anthropic.
+  Terminal sessions in this site are <em>simulations</em> for teaching; always check the <a href="https://docs.claude.com/en/docs/claude-code/overview" target="_blank" rel="noopener">official docs</a> for the latest behavior.
+</footer>
+
+<script src="assets/app.js"></script>
+<script>
+TUTOR.ready(function () {
+  var cards = document.getElementById("cards");
+  var tags = {
+    "01": ["Mental model", "Lab"], "02": ["CLAUDE.md", "Lab"], "03": ["Plan mode", "Lab"],
+    "04": ["/goal", "/loop", "Lab"], "05": ["Hooks", "Lab"], "06": ["Skills", "Lab"],
+    "07": ["Sub-agents", "Lab"], "08": ["Project", "All layers"], "09": ["Reference", "Exam"]
+  };
+  var blurbs = {
+    "01": "Why agents feel magical then fail mysteriously. The gather → act → verify loop, and where you fit in it.",
+    "02": "CLAUDE.md is the most leveraged file in your repo. What to put in it, what to leave out, and how context rots.",
+    "03": "Explore → plan → code → commit. Use plan mode to catch the wrong approach before it becomes 400 lines of diff.",
+    "04": "Give the agent a finish line it can't fake. /goal, /loop, test-driven stop conditions and the Ralph loop.",
+    "05": "Prompts are suggestions; hooks are law. Block dangerous commands, auto-format, and gate 'done' on green tests.",
+    "06": "Package recurring know-how into skills Claude loads only when relevant. Write one and test whether it triggers.",
+    "07": "Context isolation, parallel fan-out and the conductor pattern. When more agents help — and when they just cost more.",
+    "08": "Build a real app end to end: CLAUDE.md, plan, goal, hooks, a custom skill and a reviewer sub-agent working together.",
+    "09": "Every command, file path and config in one page — plus a 15-question final exam."
+  };
+  TUTOR.LESSONS.forEach(function (l) {
+    var a = document.createElement("a");
+    a.className = "card"; a.href = "lessons/" + l.slug; a.setAttribute("data-id", l.id);
+    a.innerHTML = '<div class="card-top"><span class="card-num">Lesson ' + parseInt(l.id, 10) + '</span><span class="card-status chip ok" style="display:none"></span></div>' +
+      "<h3>" + TUTOR.esc(l.title) + "</h3><p>" + blurbs[l.id] + '</p><div class="card-foot">' +
+      tags[l.id].map(function (t) { return '<span class="chip">' + TUTOR.esc(t) + "</span>"; }).join("") +
+      '<span class="chip" style="margin-left:auto">' + TUTOR.esc(l.meta.split("·").pop().trim()) + "</span></div>";
+    cards.appendChild(a);
+  });
+  // Re-run progress paint now that cards exist.
+  document.querySelectorAll(".card[data-id]").forEach(function (c) {
+    if (TUTOR.isDone(c.getAttribute("data-id"))) { c.classList.add("done"); var s = c.querySelector(".card-status"); s.style.display = ""; s.textContent = "✓ Done"; }
+  });
+
+  TUTOR.terminal("#hero-term", {
+    title: "claude — ~/todo-app",
+    interactive: false,
+    autoplay: [
+      ["sys", "✻ Claude Code · cwd: ~/todo-app", 60],
+      ["mode", "  ⏸ plan mode on (shift+tab to cycle)", 300],
+      ["user", "Add due dates to todos. Plan first, then implement with tests."],
+      ["tool", "Explore(subagent) Map how todos are stored and rendered"],
+      ["toolout", "Found src/store.ts, src/TodoItem.tsx, 14 tests"],
+      ["plan", "Plan: 1) add dueDate to Todo type  2) migrate store  3) date picker  4) overdue badge  5) tests"],
+      ["mode", "  ⏵⏵ plan approved · accept edits on"],
+      ["tool", "Edit(src/store.ts)"],
+      ["hook", "PostToolUse hook → prettier --write src/store.ts ✓"],
+      ["tool", "Bash(npm test)"],
+      ["toolout", "✓ 17 passed (3 new)"],
+      ["hook", "Stop hook → goal check: tests green, types clean ✓"],
+      ["claude", "Done. Due dates ship with an overdue badge and 3 new tests. Diff is ready for review."]
+    ]
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Agent Loop · Conducting Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-root=".." data-lesson="01">
+<main>
+<article class="article">
+  <div class="eyebrow">Lesson 1 · Mental model</div>
+  <h1>The Agent Loop</h1>
+  <p class="dek">Coding agents feel like magic until they confidently ship the wrong fix. Both behaviors come from the same twelve-line loop, and once you see it you'll know exactly where to intervene.</p>
+  <div class="byline"><span>15 min read</span><span>1 lab</span><span>1 simulator</span><span>Quiz</span></div>
+
+  <div class="objectives">
+    <h4>By the end of this lesson you will</h4>
+    <ul>
+      <li>Describe an agent as <em>model + tools + loop</em>, and explain why the loop is the part you control</li>
+      <li>Recognize the three phases — gather, act, verify — in any agent transcript</li>
+      <li>Name the five classic agent failure modes and which harness layer fixes each</li>
+      <li>Run your first Claude Code session (simulated) and know the handful of commands you'll use daily</li>
+    </ul>
+  </div>
+
+  <div data-toc></div>
+
+  <h2>From autocomplete to delegation</h2>
+  <p>Most of us met AI coding through autocomplete: you type, it guesses the next line, you hit Tab. Then came chat: you paste code into a window, it pastes code back, and <em>you</em> are the one who runs it, reads the error and pastes again. In both modes, you are the loop. The model is a very fast, very well-read intern who has never been allowed to touch the keyboard.</p>
+  <p>Claude Code changes one thing, and that one thing changes everything: <strong>it gets the keyboard</strong>. It can read files, search, edit, run your test suite, look at the failure and try again. It runs in your terminal, in your repo, with your tools. You stop being the loop and start being the person who <em>designs</em> the loop.</p>
+  <div class="pull">The skill is no longer "write the code." It's "set up the conditions under which correct code is the most likely outcome."</div>
+  <p>That's what this course is about. Not prompts — the <strong>harness</strong>: the context, plans, finish lines, guardrails, reusable know-how and team of helpers that surround the model. Get the harness right and a mediocre prompt still lands. Get it wrong and a brilliant prompt still drifts.</p>
+
+  <h2>What an agent actually is</h2>
+  <p>Strip away the branding and every coding agent is the same shape. Here it is in pseudocode — this is genuinely most of it:</p>
+  <div class="code-file"><span>agent.py (conceptual)</span><span>~12 lines</span></div>
+<pre><code class="lang-py">def agent(task, tools):
+    context = [system_prompt, project_memory, task]
+    while True:
+        reply = model(context)                 # think + decide
+        if reply.wants_tool:
+            result = tools[reply.tool](reply.args)   # act on the world
+            context.append(reply)
+            context.append(result)             # observe the outcome
+        else:
+            return reply.text                  # model decided it's done
+</code></pre>
+  <p>Three things to notice, because every lesson that follows is a way of pulling one of these levers:</p>
+  <ol>
+    <li><strong>The context is everything the model knows.</strong> It starts with a system prompt and your project memory (<code>CLAUDE.md</code>), and grows with every tool result. Nothing outside it exists. → <a href="02-context-claude-md.html">Lesson 2</a></li>
+    <li><strong>The model decides when it's done.</strong> That <code>else: return</code> branch is the single most dangerous line. If "done" is a feeling rather than a fact, you get premature victory. → <a href="04-goals-loops.html">Lesson 4</a></li>
+    <li><strong>Tools are where intent meets the world.</strong> Every <code>tools[...]()</code> call is a point where you can inspect, block or augment what happens — deterministically, outside the model. → <a href="05-hooks.html">Lesson 5</a></li>
+  </ol>
+
+  <h2>Gather → Act → Verify</h2>
+  <p>Watch any good agent transcript and you'll see the loop break into three recurring phases. Anthropic describes Claude Code's own loop this way, and it's the most useful lens for reading — and steering — what the agent does.</p>
+
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 720 260" role="img" aria-label="Cycle diagram: gather context, take action, verify work, repeating">
+        <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker></defs>
+        <rect x="20" y="80" width="190" height="100" rx="14" class="d-box"/>
+        <text x="115" y="118" text-anchor="middle" font-weight="700" font-size="16">1 · Gather</text>
+        <text x="115" y="142" text-anchor="middle" class="d-muted" font-size="12.5">Read · Grep · Glob</text>
+        <text x="115" y="160" text-anchor="middle" class="d-muted" font-size="12.5">sub-agents · web</text>
+        <rect x="265" y="80" width="190" height="100" rx="14" class="d-accent"/>
+        <text x="360" y="118" text-anchor="middle" font-weight="700" font-size="16">2 · Act</text>
+        <text x="360" y="142" text-anchor="middle" class="d-muted" font-size="12.5">Edit · Write · Bash</text>
+        <text x="360" y="160" text-anchor="middle" class="d-muted" font-size="12.5">MCP tools</text>
+        <rect x="510" y="80" width="190" height="100" rx="14" class="d-box"/>
+        <text x="605" y="118" text-anchor="middle" font-weight="700" font-size="16">3 · Verify</text>
+        <text x="605" y="142" text-anchor="middle" class="d-muted" font-size="12.5">tests · types · lint</text>
+        <text x="605" y="160" text-anchor="middle" class="d-muted" font-size="12.5">screenshots · review</text>
+        <g class="d-line" stroke-width="1.5" marker-end="url(#a1)">
+          <path d="M210 130 L 262 130"/><path d="M455 130 L 507 130"/>
+          <path d="M605 182 C 605 240, 115 240, 115 184"/>
+        </g>
+        <text x="360" y="236" text-anchor="middle" class="d-muted" font-size="12.5">failure? gather more context and go again</text>
+        <text x="360" y="40" text-anchor="middle" class="d-muted" font-size="12.5">You can intervene at any arrow: interrupt (Esc), redirect, or let it run</text>
+      </svg>
+    </div>
+    <figcaption>The loop isn't strictly sequential — good agents interleave phases — but every turn belongs to one of these three.</figcaption>
+  </figure>
+
+  <h3>Gather: the phase people under-invest in</h3>
+  <p>An agent that edits before it understands is guessing. The cheapest improvement you can make to almost any session is to tell it to <em>read first</em>: "look at how auth works in <code>src/auth</code> before proposing anything." Plan mode (lesson 3) formalizes this — it physically prevents edits until you approve a plan.</p>
+
+  <h3>Act: small, reversible steps</h3>
+  <p>Agents are best at small diffs they can immediately check. A 40-line change followed by a test run beats a 400-line change followed by hope. Claude Code checkpoints edits so you can rewind (<kbd>Esc</kbd> <kbd>Esc</kbd>), but your real safety net is git: commit at green.</p>
+
+  <h3>Verify: the phase that makes the rest trustworthy</h3>
+  <p>Verification is what turns an agent from a confident guesser into an engineer. Tests, type checks, linters, a screenshot of the rendered UI, a second agent reviewing the diff — anything that returns a fact the model can't talk its way around. Boris Cherny, who created Claude Code, has said that giving Claude a way to verify its own work is probably the single most important thing for getting great results. Every advanced technique in this course is, at heart, a way to make verification automatic.</p>
+
+  <div data-widget="loop-stepper"></div>
+
+  <h2>The context window is a budget</h2>
+  <p>Notice the meter in the lab. Every file read, every test log, every tool result lands in the context window and stays there. It's large — but it isn't free, and it isn't uniform. As the window fills, older details get less attention, sessions get slower and more expensive, and eventually Claude Code compacts (summarizes) the history to make room. Details can fall out in that summary.</p>
+  <p>Practitioners call the gradual degradation <strong>context rot</strong>, and managing it is a core skill:</p>
+  <ul>
+    <li><strong><code>/clear</code> between unrelated tasks.</strong> A fresh window beats a polluted one. Your <code>CLAUDE.md</code> reloads automatically.</li>
+    <li><strong>Delegate noisy work to sub-agents.</strong> A sub-agent can read 40 files and hand back a 10-line summary; only the summary enters your main context. (Lesson 7)</li>
+    <li><strong>Write state to files, not to chat.</strong> A <code>PLAN.md</code> or <code>progress.md</code> survives <code>/clear</code>, compaction and even a new session.</li>
+  </ul>
+  <div class="callout tip"><div class="callout-icon">💡</div><div><div class="callout-title">Run /context</div><p>Inside Claude Code, <code>/context</code> shows what's currently occupying the window — system prompt, tools, memory files, messages. Check it when a session starts feeling "dumber"; it usually is just full.</p></div></div>
+
+  <h2>Five ways agents fail (and the fix for each)</h2>
+  <p>After enough sessions, you stop seeing random failures and start seeing the same five. Each maps neatly onto one layer of the harness:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Failure mode</th><th>What it looks like</th><th>Harness fix</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Amnesia</strong></td><td>Uses npm in your pnpm repo. Again. Ignores the conventions you explained yesterday.</td><td><a href="02-context-claude-md.html">CLAUDE.md</a></td></tr>
+      <tr><td><strong>Wrong approach</strong></td><td>Builds a beautiful solution to a slightly different problem. You find out 400 lines later.</td><td><a href="03-plan-mode.html">Plan mode</a></td></tr>
+      <tr><td><strong>Premature victory</strong></td><td>"All tests pass!" (they were never run). "Done!" (half the checklist remains).</td><td><a href="04-goals-loops.html">Goals &amp; loops</a></td></tr>
+      <tr><td><strong>Rule drift</strong></td><td>Was told never to touch <code>.env</code> or run <code>git push --force</code>. Did it anyway, on turn 60.</td><td><a href="05-hooks.html">Hooks</a></td></tr>
+      <tr><td><strong>Context overload</strong></td><td>Huge task, one session; quality degrades as the window fills with logs and file dumps.</td><td><a href="06-skills.html">Skills</a> + <a href="07-subagents.html">Sub-agents</a></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Where you fit: from pair to conductor</h2>
+  <p>Addy Osmani describes a progression in how engineers work with coding agents — from the <strong>conductor</strong>, guiding a single agent in real time, to the <strong>orchestrator</strong>, setting up several agents to work in parallel and reviewing their output asynchronously. It's a useful ladder for thinking about your own practice:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Stage</th><th>You do</th><th>Agent does</th><th>You need</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Pair</strong></td><td>Approve each edit, steer constantly</td><td>Small, supervised changes</td><td>Lessons 1–3</td></tr>
+      <tr><td><strong>Conductor</strong></td><td>Set the goal and the checks; review the result</td><td>A full task, self-verified</td><td>Lessons 4–6</td></tr>
+      <tr><td><strong>Orchestrator</strong></td><td>Decompose work, run agents in parallel, merge</td><td>Several tasks at once, in isolation</td><td>Lesson 7–8</td></tr>
+    </tbody>
+  </table></div>
+  <p>Don't skip rungs. Orchestrating five agents without reliable verification just produces five times the plausible-looking wrong code — faster.</p>
+
+  <h2>Your first session</h2>
+  <p>Installation is one command (check the <a href="https://docs.claude.com/en/docs/claude-code/setup" target="_blank" rel="noopener">official setup guide</a> for current options):</p>
+<pre><code class="lang-bash"># install (native installer; npm install -g @anthropic-ai/claude-code also works)
+curl -fsSL https://claude.ai/install.sh | bash
+# then start a session inside your project
+cd my-project
+claude
+</code></pre>
+  <p>Try a simulated session below. It's scripted, not a real model — the goal is to build muscle memory for the commands you'll use every day. Click a suggestion or type your own.</p>
+  <div id="term-first"></div>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Command / key</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>/init</code></td><td>Scans the repo and drafts a starter <code>CLAUDE.md</code></td></tr>
+      <tr><td><code>/clear</code></td><td>Wipes conversation history; start a fresh task</td></tr>
+      <tr><td><code>/compact</code></td><td>Summarizes history to free context (optionally with focus instructions)</td></tr>
+      <tr><td><code>/context</code></td><td>Shows what's using the context window</td></tr>
+      <tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Cycles permission modes (default → auto-accept edits → plan)</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Interrupt Claude mid-action so you can redirect</td></tr>
+      <tr><td><kbd>Esc</kbd> <kbd>Esc</kbd></td><td>Rewind to an earlier point in the conversation / code</td></tr>
+      <tr><td><code>claude -c</code></td><td>Continue the most recent conversation</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Key takeaways</h2>
+  <ul>
+    <li>An agent is <strong>model + tools + loop</strong>. You can't change the model's weights, but you control nearly everything about the loop.</li>
+    <li>Read every transcript as <strong>gather → act → verify</strong>. Most bad outcomes are a starved gather phase or a missing verify phase.</li>
+    <li><strong>Context is a budget.</strong> Clear between tasks, push noisy work into sub-agents, persist state in files.</li>
+    <li>The five failure modes — amnesia, wrong approach, premature victory, rule drift, context overload — each have a specific harness fix. The next six lessons cover them one by one.</li>
+  </ul>
+
+  <div id="quiz"></div>
+</article>
+</main>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/widgets/loop-stepper.js"></script>
+<script>
+TUTOR.ready(function () {
+  TUTOR.terminal("#term-first", {
+    title: "claude — ~/shop-api",
+    hints: ["/init", "/context", "explain this codebase", "/clear", "/help"],
+    banner: [
+      ["sys", "✻ Welcome to Claude Code (simulated)", 80],
+      ["sys", "  cwd: ~/shop-api", 80],
+      ["sys", "  Tip: type /help, or click a suggestion below.", 80]
+    ],
+    commands: [
+      { match: "/init", steps: [
+        ["tool", "Glob(**/*.{ts,json,md})"], ["toolout", "212 files"],
+        ["tool", "Read(package.json)"], ["toolout", "scripts: dev, test, lint, typecheck · pnpm workspace"],
+        ["tool", "Read(README.md)"], ["toolout", "Express + Prisma REST API for the shop"],
+        ["tool", "Write(CLAUDE.md)"],
+        ["toolout", "# shop-api\n## Commands\n- pnpm test · pnpm lint · pnpm typecheck\n## Architecture\n- src/routes → src/services → prisma\n..."],
+        ["claude", "Created CLAUDE.md with build commands, architecture notes and conventions. Review and edit it — it's loaded into every future session."]
+      ]},
+      { match: "/context", steps: [
+        ["sys", "Context usage (simulated)"],
+        ["sys", "  ▓▓▓░░░░░░░░░░░░░░░░░  System prompt + tools   ~9%"],
+        ["sys", "  ▓░░░░░░░░░░░░░░░░░░░  Memory files (CLAUDE.md) ~2%"],
+        ["sys", "  ▓░░░░░░░░░░░░░░░░░░░  Messages                 ~3%"],
+        ["sys", "  ░░░░░░░░░░░░░░░░░░░░  Free space               ~86%"]
+      ]},
+      { match: /explain|codebase|overview|how does/i, steps: [
+        ["tool", "Task(Explore) Map the request flow from route to database"],
+        ["toolout", "Explored 31 files in an isolated context"],
+        ["claude", "shop-api is an Express app. Requests hit src/routes/*, which call services in src/services/*, which use Prisma (schema in prisma/schema.prisma). Auth is JWT middleware in src/middleware/auth.ts. Tests use Vitest with a SQLite test DB."],
+        ["claude", "Notice: the exploration ran in a sub-agent, so only this summary — not 31 files — entered our context."]
+      ]},
+      { match: "/clear", steps: [["clear"], ["sys", "(conversation cleared — CLAUDE.md will be reloaded on the next message)"]] },
+      { match: "/help", steps: [
+        ["sys", "Common commands:"],
+        ["sys", "  /init     draft a CLAUDE.md          /context  show context usage"],
+        ["sys", "  /clear    start fresh                /compact  summarize history"],
+        ["sys", "  /agents   manage sub-agents          /hooks    manage hooks"],
+        ["sys", "  /memory   edit memory files          /model    switch model"],
+        ["sys", "Keys: Shift+Tab cycle modes · Esc interrupt · Esc Esc rewind"]
+      ]}
+    ],
+    fallback: function (input) {
+      return [
+        ["tool", "Grep(\"" + input.split(" ").slice(0, 2).join(" ").replace(/"/g, "") + "\")"],
+        ["toolout", "(simulated) a few matches in src/"],
+        ["claude", "In a real session I'd gather context, act, then verify. This simulator only scripts a few commands — try /init, /context or \"explain this codebase\"."]
+      ];
+    }
+  });
+
+  TUTOR.quiz("#quiz", { questions: [
+    { q: "In the agent loop, who decides that the task is finished?",
+      options: ["The user, always", "The model, when it stops requesting tools", "The test runner", "A timer"],
+      answer: 1, why: "By default the model ends the loop when it replies without a tool call. That's why lesson 4 is about giving it a finish line it can't fake." },
+    { q: "Claude rewrote a function but never ran the tests, then reported success. Which phase was skipped?",
+      options: ["Gather", "Act", "Verify", "Compact"],
+      answer: 2, why: "Premature victory is a missing verify phase. The fix is to make verification mandatory — via instructions, a goal condition, or a Stop hook." },
+    { q: "A session has grown long and the agent starts forgetting earlier constraints. What's the best first move?",
+      options: ["Write a longer prompt", "Switch to a bigger model", "Persist key state to a file, then /clear and continue", "Disable all tools"],
+      answer: 2, why: "Context rot is fixed by managing the window, not by adding to it. Save state to a file and start clean." },
+    { q: "Which harness layer is the right fix for 'it keeps running git push --force even though CLAUDE.md says not to'?",
+      options: ["A longer CLAUDE.md", "A PreToolUse hook that blocks the command", "Plan mode", "A sub-agent"],
+      answer: 1, why: "Instructions are advisory; hooks are deterministic. Anything that must never happen belongs in a hook (lesson 5)." }
+  ]});
+});
+</script>
+</body>
+</html>

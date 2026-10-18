@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context Is the Program · Conducting Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-root=".." data-lesson="02">
+<main>
+<article class="article">
+  <div class="eyebrow">Lesson 2 · CLAUDE.md &amp; memory</div>
+  <h1>Context Is the Program</h1>
+  <p class="dek">Every session starts from zero, except for the few hundred lines you choose to load first. CLAUDE.md is the most leveraged file in your repo. Most teams treat it like a junk drawer.</p>
+  <div class="byline"><span>20 min read</span><span>1 lab</span><span>1 simulator</span><span>Quiz</span></div>
+
+  <div class="objectives">
+    <h4>By the end of this lesson you will</h4>
+    <ul>
+      <li>Know every place Claude Code looks for memory files, and the order they load in</li>
+      <li>Write a CLAUDE.md that is short, specific and checkable, and know what to leave out</li>
+      <li>Use <code>@imports</code>, <code>.claude/rules/</code> and <code>CLAUDE.local.md</code> to keep memory modular</li>
+      <li>Manage a session's context with <code>/clear</code>, <code>/compact</code> and state files, so quality doesn't decay as the window fills</li>
+    </ul>
+  </div>
+
+  <div data-toc></div>
+
+  <h2>The program you didn't know you were writing</h2>
+  <p>In lesson 1 we wrote the agent loop in twelve lines, and the first line was <code>context = [system_prompt, project_memory, task]</code>. The model has no persistent memory of your codebase. It doesn't remember yesterday's session or that your team switched to pnpm last spring. Each session it knows exactly what is in that list, and nothing else.</p>
+  <p>That makes the context window the closest thing an agent has to a program. Your prompt is a function call. CLAUDE.md is the standard library that gets imported into every call. When people say Claude "ignores conventions," the convention is usually missing from context, or buried in a sea of other text.</p>
+  <div class="pull">If an instruction isn't in the context window, it doesn't exist. If it's in there with 300 other instructions, it barely exists.</div>
+  <p>This lesson is about curating that window: what goes in permanently (memory files), what goes in on demand (imports, rules, skills), and how to keep a long session from drowning in its own logs.</p>
+
+  <h2>Where memory files live</h2>
+  <p>Claude Code reads memory from several places and <strong>concatenates</strong> them. Nothing overrides anything; it all lands in context together. Broader scopes load first, more specific ones after.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Scope</th><th>Path</th><th>Use it for</th><th>In git?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Managed policy</strong></td><td><code>/Library/Application Support/ClaudeCode/CLAUDE.md</code> (macOS), <code>/etc/claude-code/CLAUDE.md</code> (Linux)</td><td>Org-wide rules set by IT</td><td>—</td></tr>
+      <tr><td><strong>User</strong></td><td><code>~/.claude/CLAUDE.md</code></td><td>Your personal preferences across every project</td><td>No</td></tr>
+      <tr><td><strong>Project</strong></td><td><code>./CLAUDE.md</code> or <code>./.claude/CLAUDE.md</code></td><td>Team-shared commands, architecture, conventions</td><td>Yes</td></tr>
+      <tr><td><strong>Local</strong></td><td><code>./CLAUDE.local.md</code></td><td>Your notes on this project (sandbox URLs, personal shortcuts)</td><td>No (gitignore it)</td></tr>
+      <tr><td><strong>Subdirectory</strong></td><td><code>packages/api/CLAUDE.md</code></td><td>Rules for one area. Loaded when Claude works with files there</td><td>Yes</td></tr>
+      <tr><td><strong>Auto memory</strong></td><td><code>~/.claude/projects/&lt;project&gt;/memory/</code></td><td>Notes Claude writes for itself across sessions</td><td>No</td></tr>
+    </tbody>
+  </table></div>
+
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 720 270" role="img" aria-label="Diagram: memory files stack into the context window in load order, from managed policy down to subdirectory files loaded on demand">
+        <g font-size="13">
+          <rect x="30" y="20" width="300" height="34" rx="8" class="d-box"/><text x="46" y="42" font-weight="600">Managed policy</text><text x="314" y="42" text-anchor="end" class="d-muted" font-size="11.5">org</text>
+          <rect x="30" y="62" width="300" height="34" rx="8" class="d-box"/><text x="46" y="84" font-weight="600">~/.claude/CLAUDE.md</text><text x="314" y="84" text-anchor="end" class="d-muted" font-size="11.5">you</text>
+          <rect x="30" y="104" width="300" height="34" rx="8" class="d-accent"/><text x="46" y="126" font-weight="600">./CLAUDE.md  (+ @imports)</text><text x="314" y="126" text-anchor="end" class="d-muted" font-size="11.5">team</text>
+          <rect x="30" y="146" width="300" height="34" rx="8" class="d-box"/><text x="46" y="168" font-weight="600">./CLAUDE.local.md</text><text x="314" y="168" text-anchor="end" class="d-muted" font-size="11.5">you, here</text>
+          <rect x="30" y="188" width="300" height="34" rx="8" class="d-box" stroke-dasharray="4 3"/><text x="46" y="210" font-weight="600">packages/api/CLAUDE.md</text><text x="314" y="210" text-anchor="end" class="d-muted" font-size="11.5">on demand</text>
+        </g>
+        <g class="d-line" stroke-width="1.4"><path d="M340 120 L 420 120"/><path d="M412 114 L 420 120 L 412 126"/></g>
+        <rect x="430" y="20" width="260" height="202" rx="14" class="d-box"/>
+        <text x="560" y="46" text-anchor="middle" font-weight="700" font-size="14">Context window</text>
+        <rect x="448" y="60" width="224" height="26" rx="5" class="d-accent"/><text x="560" y="78" text-anchor="middle" font-size="12">system prompt + tools</text>
+        <rect x="448" y="92" width="224" height="40" rx="5" class="d-accent"/><text x="560" y="116" text-anchor="middle" font-size="12">memory (all files, concatenated)</text>
+        <rect x="448" y="138" width="224" height="70" rx="5" fill="none" class="d-line" stroke-dasharray="3 3"/><text x="560" y="177" text-anchor="middle" class="d-muted" font-size="12">your conversation…</text>
+        <text x="360" y="252" text-anchor="middle" class="d-muted" font-size="12">Load order runs top to bottom. More specific files come later, so they're read last.</text>
+      </svg>
+    </div>
+    <figcaption>Memory is additive. If two files disagree, you've created ambiguity, not an override. Fix the conflict at the source.</figcaption>
+  </figure>
+
+  <div class="callout info"><div class="callout-icon">ℹ️</div><div><div class="callout-title">Already have an AGENTS.md?</div><p>If a repo has <code>AGENTS.md</code> and no CLAUDE.md, Claude Code reads AGENTS.md instead. If you want both, a one-line CLAUDE.md containing <code>@AGENTS.md</code> keeps them in sync.</p></div></div>
+
+  <h2>What belongs in CLAUDE.md</h2>
+  <p>A good test for each line: <em>would a sharp new teammate get this wrong on their first day without being told?</em> If yes, it belongs. If they'd figure it out from the code in 30 seconds, it's noise. Here's what consistently earns its place:</p>
+  <ol>
+    <li><strong>Commands.</strong> How to build, test a single file, lint, typecheck, run migrations. This is the highest-value section by far, because it's what lets the agent <em>verify</em> its work.</li>
+    <li><strong>A map.</strong> Three to six bullets on where things live and how a request flows. It saves dozens of exploratory reads per session.</li>
+    <li><strong>Non-obvious conventions.</strong> "Money is integer cents." "Never edit an applied migration." Not "write clean code."</li>
+    <li><strong>Workflow expectations.</strong> "Propose a plan for multi-file changes." "Run typecheck and tests before reporting done."</li>
+    <li><strong>Known gotchas.</strong> The flaky test, the env var that must be set, the generated file you shouldn't edit by hand.</li>
+  </ol>
+  <p>And here is what doesn't belong, even though it often ends up there:</p>
+  <ul>
+    <li><strong>Pasted documentation.</strong> API references and wiki pages bloat every session. Link them with an import or let Claude read them when needed.</li>
+    <li><strong>Vague virtues.</strong> "Follow best practices" costs tokens and changes nothing. The model already wants to write good code; tell it what <em>good</em> means here.</li>
+    <li><strong>Secrets.</strong> The file is in git and loaded into every session. Point to where secrets live instead.</li>
+    <li><strong>Anything that must never happen.</strong> CLAUDE.md is advisory. If a rule breaking would be a real incident, enforce it with a hook or a permission rule (lesson 5).</li>
+  </ul>
+  <div class="callout tip"><div class="callout-icon">💡</div><div><div class="callout-title">Keep it under ~200 lines</div><p>The official guidance is to keep each CLAUDE.md under roughly 200 lines. Every line costs context in every session, and long files dilute attention: the one rule that matters competes with forty that don't. Start with <code>/init</code>, then <em>delete</em> more than you add.</p></div></div>
+
+  <h3>A reference CLAUDE.md</h3>
+  <p>This is a realistic shape for a mid-sized web app. It runs about 25 lines and every line is either a command, a fact about the code, or a checkable rule.</p>
+  <div class="code-file"><span>CLAUDE.md</span><span>~25 lines</span></div>
+<pre><code class="lang-md"># shop-web
+
+Next.js 15 storefront + tRPC API. Postgres via Prisma. pnpm workspace.
+
+## Commands
+- `pnpm dev` — start app on :3000
+- `pnpm test path/to/file` — run one test file (Vitest)
+- `pnpm typecheck &amp;&amp; pnpm lint` — run both before saying a task is done
+- `pnpm db:migrate` — apply migrations (never edit an applied migration)
+
+## Architecture
+- `app/` routes → `server/routers/*` (tRPC) → `server/services/*` → Prisma
+- Business logic lives in services, never in route handlers
+- API reference: @docs/api.md
+
+## Conventions
+- TypeScript strict; no `any` without a `// reason:` comment
+- Money is integer cents (`priceCents`), never floats
+- Every bug fix gets a regression test next to the code (`*.test.ts`)
+
+## Workflow
+- Multi-file change? Propose a plan first.
+- YOU MUST run `pnpm typecheck &amp;&amp; pnpm test` and show the output before reporting done.
+</code></pre>
+  <p>Notice the single shouted rule at the end. Emphasis works because it's rare. If everything is IMPORTANT, nothing is.</p>
+
+  <div data-widget="claudemd-lab"></div>
+
+  <h2>Keep memory modular: imports, rules, local files</h2>
+  <p>As a project grows, one CLAUDE.md becomes either too long or too vague. Claude Code gives you three tools to split it without losing anything.</p>
+
+  <h3>@imports: link, don't paste</h3>
+  <p>Anywhere in a memory file, <code>@path/to/file</code> pulls that file in. Relative paths resolve from the importing file, and imports can nest up to four hops deep. Use it to reference docs that already exist instead of copying them.</p>
+<pre><code class="lang-md"># CLAUDE.md
+See @README.md for the project overview and @package.json for scripts.
+
+## Deeper references
+- Git workflow: @docs/git-workflow.md
+- My personal overrides: @~/.claude/my-shop-notes.md
+</code></pre>
+
+  <h3>.claude/rules/: one topic per file</h3>
+  <p>Markdown files in <code>.claude/rules/</code> (searched recursively) are loaded as memory too. Each team or concern can own a small file, such as <code>testing.md</code>, <code>api-design.md</code> or <code>security.md</code>, instead of everyone fighting over one document. Rules can be <strong>path-scoped</strong> with frontmatter, so frontend rules only load when Claude touches frontend files:</p>
+  <div class="code-file"><span>.claude/rules/react.md</span><span>path-scoped</span></div>
+<pre><code class="lang-md">---
+paths:
+  - "app/**/*.tsx"
+  - "components/**/*.tsx"
+---
+# React conventions
+- Server components by default; add "use client" only for interactivity
+- Co-locate component tests as `Component.test.tsx`
+- Use the `cn()` helper from `lib/utils` for conditional classes
+</code></pre>
+
+  <h3>CLAUDE.local.md: yours, not the team's</h3>
+  <p>Your staging URL, your seeded test account, your preference for verbose test output: put these in <code>CLAUDE.local.md</code> at the project root and add it to <code>.gitignore</code>. It loads after the project file, so it's read last.</p>
+
+  <h2>Auto memory and /memory</h2>
+  <p>Separately from the files you write, Claude Code keeps an <strong>auto memory</strong>: a <code>MEMORY.md</code> index plus topic files under <code>~/.claude/projects/&lt;project&gt;/memory/</code>. Claude saves things it learns about you and the project, such as a correction you gave or a build quirk it discovered, and the start of <code>MEMORY.md</code> loads into future sessions. It's on by default. You can turn it off with <code>"autoMemoryEnabled": false</code> in settings.</p>
+  <p>Two commands manage all of this:</p>
+  <ul>
+    <li><strong><code>/init</code></strong> scans the repo and drafts a CLAUDE.md. If one already exists, it suggests improvements instead of overwriting.</li>
+    <li><strong><code>/memory</code></strong> lists every memory file currently loaded, opens any of them in your editor, and toggles auto memory.</li>
+  </ul>
+  <div class="callout pro"><div class="callout-icon">🎼</div><div><div class="callout-title">Treat corrections as memory edits</div><p>When you catch yourself correcting the same thing twice ("no, we use pnpm"), stop and fix the source. Ask Claude to add the rule to CLAUDE.md, or open it with <code>/memory</code>. Every correction you don't persist, you'll make again next week.</p></div></div>
+
+  <h2>Advisory, not enforcement</h2>
+  <p>It's worth being blunt about the limits. CLAUDE.md is <em>context</em>: Claude reads it and usually follows it, but nothing guarantees it. On turn 80 of a long session, with 60,000 tokens of logs between the rule and the decision, "never push to main" is a fading memory.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>You want…</th><th>Use</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Claude to know how the project works</td><td>CLAUDE.md</td><td>Context is the right tool for knowledge</td></tr>
+      <tr><td>A command to never run</td><td><code>permissions.deny</code> or a PreToolUse hook</td><td>Enforced outside the model, every time</td></tr>
+      <tr><td>Something to always happen after an edit</td><td>PostToolUse hook</td><td>Deterministic, needs no reminder</td></tr>
+      <tr><td>A recurring multi-step procedure</td><td>A skill</td><td>Loads only when relevant (lesson 6)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Context rot, and how to stay clean</h2>
+  <p>Memory is what you load at the start. Hygiene is what you do as the session goes on. Every file read and test log stays in the window, and as it fills, older instructions get less attention. Eventually Claude Code compacts the history automatically, and details can fall out in the summary. Four habits keep you ahead of it:</p>
+  <ol>
+    <li><strong><code>/clear</code> between tasks.</strong> Finished the bug fix and starting a feature? Clear. Memory files reload; yesterday's stack traces don't.</li>
+    <li><strong><code>/compact</code> with a focus.</strong> When you need to keep going but the window is heavy, compact on your terms, for example <code>/compact keep the API contract decisions and the list of failing tests</code>. You choose what survives instead of leaving it to chance.</li>
+    <li><strong>State lives in files.</strong> For anything multi-step, have Claude maintain <code>PLAN.md</code> or <code>progress.md</code> with a checklist. Files survive <code>/clear</code>, compaction and new sessions, and they're reviewable in git.</li>
+    <li><strong>Check <code>/context</code> when quality dips.</strong> A session that suddenly feels "dumber" is usually just full.</li>
+  </ol>
+  <div class="code-file"><span>progress.md</span><span>pattern</span></div>
+<pre><code class="lang-md"># Migrate checkout to Stripe Payment Element
+Started: 2026-10-18 · Branch: feat/payment-element
+
+## Done
+- [x] Characterization tests for current checkout (tests/checkout.spec.ts)
+- [x] Server: create PaymentIntent endpoint
+
+## Next
+- [ ] Client: replace CardElement with PaymentElement
+- [ ] Remove legacy /api/charge route
+
+## Decisions
+- Keep idempotency keys in Redis (not Postgres): see thread in PR #412
+</code></pre>
+  <p>Ask Claude to update the file at the end of each step. Then a fresh session only needs one instruction: "Read progress.md and continue."</p>
+
+  <h2>Try it: memory commands</h2>
+  <p>A scripted session to practise the commands. Try <code>/init</code> first, then explore.</p>
+  <div id="term-memory"></div>
+
+  <h2>Key takeaways</h2>
+  <ul>
+    <li>The context window is the agent's whole world. <strong>CLAUDE.md is the part of it you control for every session</strong>, so treat it like code.</li>
+    <li>Memory files <strong>concatenate</strong>, from managed and user scope down to project, local and subdirectory. Nothing overrides; conflicts just create ambiguity.</li>
+    <li>Put in <strong>commands, a map, non-obvious conventions and gotchas</strong>. Leave out pasted docs, vague virtues and secrets. Stay under ~200 lines.</li>
+    <li>Split with <strong><code>@imports</code>, <code>.claude/rules/</code> and <code>CLAUDE.local.md</code></strong>, rather than growing one giant file.</li>
+    <li>CLAUDE.md is <strong>advisory</strong>. Hard rules belong in permissions and hooks.</li>
+    <li>Manage the window as you go: <strong><code>/clear</code> between tasks, <code>/compact</code> with a focus, state in files</strong>.</li>
+  </ul>
+
+  <div id="quiz"></div>
+</article>
+</main>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/widgets/claudemd-lab.js"></script>
+<script>
+TUTOR.ready(function () {
+  TUTOR.terminal("#term-memory", {
+    title: "claude — ~/shop-web",
+    hints: ["/init", "/memory", "/context", "/compact keep the API decisions", "we use pnpm, not npm", "/clear"],
+    banner: [
+      ["sys", "✻ Claude Code (simulated) · cwd: ~/shop-web", 80],
+      ["sys", "  No CLAUDE.md found. Try /init.", 80]
+    ],
+    commands: [
+      { match: "/init", steps: function (input, ctx) {
+        if (ctx.state.hasMd) return [
+          ["tool", "Read(CLAUDE.md)"], ["toolout", "24 lines"],
+          ["claude", "CLAUDE.md already exists, so I won't overwrite it. Suggestions: add the single-test command (`pnpm test path/to/file`), and note that prisma/migrations are append-only."]
+        ];
+        ctx.state.hasMd = true;
+        return [
+          ["tool", "Glob(**/*)"], ["toolout", "318 files · pnpm-workspace.yaml · next.config.ts · prisma/schema.prisma"],
+          ["tool", "Read(package.json)"], ["toolout", "scripts: dev, build, test, lint, typecheck, db:migrate"],
+          ["tool", "Read(README.md)"], ["toolout", "Next.js storefront with tRPC API"],
+          ["tool", "Write(CLAUDE.md)"],
+          ["toolout", "# shop-web\n## Commands\n- pnpm dev · pnpm test · pnpm lint · pnpm typecheck\n## Architecture\n- app/ → server/routers → server/services → Prisma\n## Conventions\n- (draft) review and edit me"],
+          ["claude", "Drafted CLAUDE.md (24 lines). It's a starting point: delete anything generic, and add the things only your team knows."]
+        ];
+      }},
+      { match: "/memory", steps: function (input, ctx) {
+        return [
+          ["sys", "Memory files loaded in this session:"],
+          ["sys", "  ~/.claude/CLAUDE.md                       user     (12 lines)"],
+          ["sys", ctx.state.hasMd ? "  ./CLAUDE.md                               project  (" + (ctx.state.pnpm ? "25" : "24") + " lines)" : "  ./CLAUDE.md                               project  (missing — run /init)"],
+          ["sys", "  ~/.claude/projects/shop-web/memory/MEMORY.md  auto memory: on"],
+          ["sys", "Select a file to open it in $EDITOR · toggle auto memory (simulated)"]
+        ];
+      }},
+      { match: /pnpm|not npm|remember|always use/i, steps: function (input, ctx) {
+        ctx.state.pnpm = true;
+        if (!ctx.state.hasMd) return [
+          ["claude", "Got it, pnpm. There's no CLAUDE.md yet, so this lives only in our conversation and will be lost on /clear. Run /init first, and I'll add it there."]
+        ];
+        return [
+          ["tool", "Edit(CLAUDE.md)"],
+          ["toolout", "+ - Package manager is pnpm. Never use npm or yarn (lockfile is pnpm-lock.yaml)"],
+          ["claude", "Added to CLAUDE.md, so every future session (and teammate) gets it. Corrections belong in memory, not just in chat."]
+        ];
+      }},
+      { match: "/context", steps: [
+        ["sys", "Context usage (simulated)"],
+        ["sys", "  ▓▓▓░░░░░░░░░░░░░░░░░  System prompt + tools        ~9%"],
+        ["sys", "  ▓░░░░░░░░░░░░░░░░░░░  Memory files                 ~2%"],
+        ["sys", "  ▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░  Messages (test logs, reads)  ~61%"],
+        ["sys", "  ▓▓▓▓▓▓░░░░░░░░░░░░░░  Free                          ~28%"],
+        ["claude", "Most of the window is old tool output. Consider /compact with a focus, or save progress to a file and /clear."]
+      ]},
+      { match: /^\/compact/i, steps: function (input) {
+        var focus = input.replace(/^\/compact\s*/i, "");
+        return [
+          ["sys", "Compacting conversation" + (focus ? " · focus: “" + focus + "”" : "") + "…"],
+          ["toolout", "Summarized 142 messages → 1 summary (~3k tokens)"],
+          ["sys", focus ? "  Kept: " + focus + "; current task; open TODOs" : "  Kept: current task; open TODOs (no focus given: the summary decides what matters)"],
+          ["ok", "Context usage: ~61% → ~14%"]
+        ];
+      }},
+      { match: "/clear", steps: [["clear"], ["sys", "(conversation cleared — memory files reload on the next message; the chat history doesn't)"]] }
+    ],
+    fallback: function () {
+      return [["claude", "This simulator scripts the memory commands. Try /init, /memory, /context, /compact <focus>, or tell me a convention like “we use pnpm, not npm”."]];
+    }
+  });
+
+  TUTOR.quiz("#quiz", { questions: [
+    { q: "Your user-level ~/.claude/CLAUDE.md says “use 4-space indent” and the project CLAUDE.md says “use 2-space indent”. What happens?",
+      options: ["The project file overrides the user file", "The user file overrides the project file", "Both are loaded into context; the conflict creates ambiguity", "Claude Code refuses to start"],
+      answer: 2, why: "Memory files are concatenated, not merged with override rules. Resolve conflicts at the source." },
+    { q: "Which line adds the most value to a CLAUDE.md?",
+      options: ["Write clean, maintainable code following best practices.", "`pnpm test path/to/file` runs a single test file", "IMPORTANT: be careful with the database.", "A pasted copy of the full REST API reference"],
+      answer: 1, why: "Commands let the agent verify its own work and can't be inferred reliably. Vague virtues and pasted docs cost context and change little." },
+    { q: "You keep a sandbox URL and test login that only you use. Where should they go?",
+      options: ["./CLAUDE.md", "./CLAUDE.local.md (gitignored)", ".claude/rules/sandbox.md", "In every prompt"],
+      answer: 1, why: "CLAUDE.local.md is for personal, per-project notes. It loads after the project file and stays out of git." },
+    { q: "Your team must never run `git push --force`. What's the most reliable way to guarantee it?",
+      options: ["Put it in CLAUDE.md in capital letters", "Mention it at the start of each session", "A permissions deny rule or a PreToolUse hook", "Use /compact more often"],
+      answer: 2, why: "CLAUDE.md is advisory context. Enforcement belongs in permissions or hooks, which run outside the model every time." },
+    { q: "Midway through a long refactor the session feels sluggish and forgetful. What's the best move?",
+      options: ["Paste the instructions again", "Have Claude update progress.md, then /clear and say “read progress.md and continue”", "Switch off auto memory", "Add more rules to CLAUDE.md"],
+      answer: 1, why: "Persist state to a file, then start with a clean window. Files survive /clear and compaction; chat history doesn't." }
+  ]});
+});
+</script>
+</body>
+</html>

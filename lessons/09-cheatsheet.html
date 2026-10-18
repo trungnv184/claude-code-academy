@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cheat Sheet &amp; Final Exam · Conducting Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+<style>
+  .cs-search {
+    position: sticky; top: 64px; z-index: 5; display: flex; gap: 10px; align-items: center;
+    background: var(--bg); padding: 10px 0 14px; margin-bottom: 8px; border-bottom: 1px solid var(--rule);
+  }
+  .cs-search input {
+    flex: 1; font: inherit; font-size: 15px; padding: 10px 14px; border-radius: 10px; color: var(--ink);
+    background: var(--bg-elev); border: 1px solid var(--rule);
+  }
+  .cs-search input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); border-color: var(--accent); }
+  .cs-count { font-size: 13px; color: var(--ink-3); white-space: nowrap; font-family: var(--sans); }
+  .cs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+  .cs-sec { min-width: 0; }
+  .cs-sec.full { grid-column: 1 / -1; }
+  .cs-sec h2 { font-size: 22px !important; margin: 32px 0 10px !important; }
+  .cs-sec .table-wrap { margin: 0 0 8px; }
+  .cs-sec td, .cs-sec th { padding: 8px 12px; font-size: 13.5px; }
+  .cs-sec td:first-child { white-space: nowrap; }
+  .cs-empty { display: none; font-family: var(--sans); color: var(--ink-3); padding: 24px 0; }
+  mark { background: var(--accent-soft); color: var(--accent-ink); border-radius: 3px; }
+  @media (max-width: 900px) { .cs-grid { grid-template-columns: 1fr; } .cs-sec td:first-child { white-space: normal; } }
+</style>
+</head>
+<body data-root=".." data-lesson="09">
+<main>
+<article class="article wide">
+  <div class="eyebrow">Lesson 9 · Reference</div>
+  <h1>Cheat Sheet &amp; Final Exam</h1>
+  <p class="dek">Everything from the course on one page — commands, keys, file paths, hook contracts and frontmatter — followed by fifteen questions that check whether it stuck.</p>
+  <div class="byline"><span>Reference</span><span>Searchable</span><span>15-question exam</span></div>
+
+  <div class="callout info"><div class="callout-icon">ℹ️</div><div><p>Claude Code ships fast. This sheet reflects the official docs as of October 2026; when something here disagrees with <a href="https://code.claude.com/docs" target="_blank" rel="noopener">code.claude.com/docs</a>, the docs win.</p></div></div>
+
+  <div class="cs-search">
+    <input type="text" id="cs-q" placeholder="Filter: try “hook”, “Shift+Tab”, “worktree”, “exit 2”…" aria-label="Filter cheat sheet rows">
+    <span class="cs-count" id="cs-count"></span>
+  </div>
+  <div class="cs-empty" id="cs-empty">No rows match. Try a shorter term.</div>
+
+  <div class="cs-grid" id="cs-grid">
+
+  <section class="cs-sec">
+    <h2>Slash commands</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>/init</code></td><td>Draft a CLAUDE.md (suggests improvements if one exists)</td></tr>
+        <tr><td><code>/memory</code></td><td>Open memory files; toggle auto memory</td></tr>
+        <tr><td><code>/clear</code></td><td>New conversation, empty context (also clears an active goal)</td></tr>
+        <tr><td><code>/compact [focus]</code></td><td>Summarize history to free context</td></tr>
+        <tr><td><code>/context</code></td><td>Visualize what fills the context window</td></tr>
+        <tr><td><code>/plan [task]</code></td><td>Enter plan mode (optionally with a task)</td></tr>
+        <tr><td><code>/goal &lt;condition&gt;</code></td><td>Keep working until the condition is met</td></tr>
+        <tr><td><code>/loop [interval] [prompt]</code></td><td>Re-run a prompt on an interval or self-paced</td></tr>
+        <tr><td><code>/schedule</code></td><td>Cloud routines that run without your machine</td></tr>
+        <tr><td><code>/agents</code></td><td>Create and manage sub-agents</td></tr>
+        <tr><td><code>/hooks</code></td><td>Browse configured hooks and their source</td></tr>
+        <tr><td><code>/permissions</code></td><td>View/edit allow, ask, deny rules</td></tr>
+        <tr><td><code>/rewind</code></td><td>Restore code and/or conversation to a checkpoint</td></tr>
+        <tr><td><code>/resume</code></td><td>Pick up an earlier session</td></tr>
+        <tr><td><code>/model</code> · <code>/effort</code></td><td>Switch model · reasoning effort</td></tr>
+        <tr><td><code>/usage</code></td><td>Cost and plan limits (aliases <code>/cost</code>)</td></tr>
+        <tr><td><code>/mcp</code></td><td>MCP server status, auth, enable/disable</td></tr>
+        <tr><td><code>/plugin</code></td><td>Browse and install plugins</td></tr>
+        <tr><td><code>/output-style</code></td><td>Switch output style (e.g. Explanatory, Learning)</td></tr>
+        <tr><td><code>/install-github-app</code></td><td>Set up the GitHub Action for your repo</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec">
+    <h2>Keyboard shortcuts</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Key</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Cycle modes: default → acceptEdits → plan → auto</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Interrupt Claude; stop a self-paced loop</td></tr>
+        <tr><td><kbd>Esc</kbd> <kbd>Esc</kbd></td><td>Open rewind (on an empty prompt)</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td>Send running task to the background</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>Open prompt / plan in your editor</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Transcript viewer</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Toggle the task checklist</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Reverse-search prompt history</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Interrupt / clear input; twice to exit</td></tr>
+        <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td>Switch model without clearing the prompt</td></tr>
+        <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Toggle extended thinking</td></tr>
+        <tr><td><code>!</code> prefix</td><td>Shell mode — run a command, output joins the session</td></tr>
+        <tr><td><code>@</code></td><td>File path autocomplete / mention</td></tr>
+        <tr><td><code>/</code> prefix</td><td>Command and skill menu</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec full">
+    <h2>File locations</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Path</th><th>Purpose</th><th>Commit?</th></tr></thead>
+      <tbody>
+        <tr><td><code>./CLAUDE.md</code> or <code>./.claude/CLAUDE.md</code></td><td>Project memory, loaded every session</td><td>Yes</td></tr>
+        <tr><td><code>./CLAUDE.local.md</code></td><td>Personal project notes, read after CLAUDE.md</td><td>No</td></tr>
+        <tr><td><code>~/.claude/CLAUDE.md</code></td><td>Your memory across all projects</td><td>—</td></tr>
+        <tr><td><code>&lt;subdir&gt;/CLAUDE.md</code></td><td>Loaded on demand when Claude works in that directory</td><td>Yes</td></tr>
+        <tr><td><code>.claude/rules/*.md</code></td><td>Modular rules, optionally path-scoped</td><td>Yes</td></tr>
+        <tr><td><code>.claude/settings.json</code></td><td>Team permissions, hooks, env</td><td>Yes</td></tr>
+        <tr><td><code>.claude/settings.local.json</code></td><td>Personal overrides</td><td>No</td></tr>
+        <tr><td><code>~/.claude/settings.json</code></td><td>User-wide settings</td><td>—</td></tr>
+        <tr><td><code>.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>Project skill (also a <code>/name</code> command)</td><td>Yes</td></tr>
+        <tr><td><code>~/.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>Personal skill</td><td>—</td></tr>
+        <tr><td><code>.claude/commands/*.md</code></td><td>Legacy slash commands (still work; prefer skills)</td><td>Yes</td></tr>
+        <tr><td><code>.claude/agents/*.md</code></td><td>Project sub-agents</td><td>Yes</td></tr>
+        <tr><td><code>~/.claude/agents/*.md</code></td><td>Personal sub-agents</td><td>—</td></tr>
+        <tr><td><code>.mcp.json</code></td><td>Project-scoped MCP servers (<code>mcpServers</code> key)</td><td>Yes</td></tr>
+        <tr><td><code>.claude/worktrees/&lt;name&gt;/</code></td><td>Checkouts created by <code>claude --worktree</code></td><td>No</td></tr>
+        <tr><td><code>.claude/loop.md</code></td><td>Default prompt for a bare <code>/loop</code></td><td>Yes</td></tr>
+        <tr><td><code>~/.claude/projects/&lt;project&gt;/memory/MEMORY.md</code></td><td>Auto memory index (first 200 lines load)</td><td>—</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec">
+    <h2>Hook events (most used)</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Event</th><th>Fires</th></tr></thead>
+      <tbody>
+        <tr><td><code>SessionStart</code></td><td>Session begins/resumes; inject context</td></tr>
+        <tr><td><code>UserPromptSubmit</code></td><td>Before a prompt is processed; can block or add context</td></tr>
+        <tr><td><code>PreToolUse</code></td><td>Before a tool runs; can allow / deny / ask / rewrite input</td></tr>
+        <tr><td><code>PermissionRequest</code></td><td>When a permission dialog would appear</td></tr>
+        <tr><td><code>PostToolUse</code></td><td>After a tool succeeds; format, lint, log</td></tr>
+        <tr><td><code>PostToolUseFailure</code></td><td>After a tool fails</td></tr>
+        <tr><td><code>Stop</code></td><td>Claude is about to end its turn; can block</td></tr>
+        <tr><td><code>SubagentStart</code> / <code>SubagentStop</code></td><td>Sub-agent lifecycle</td></tr>
+        <tr><td><code>PreCompact</code> / <code>PostCompact</code></td><td>Around context compaction</td></tr>
+        <tr><td><code>Notification</code></td><td>Claude needs your attention</td></tr>
+        <tr><td><code>SessionEnd</code></td><td>Session ends; clean up</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec">
+    <h2>Hook contract</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Piece</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>stdin</td><td>JSON: <code>session_id</code>, <code>cwd</code>, <code>hook_event_name</code>, <code>tool_name</code>, <code>tool_input</code>…</td></tr>
+        <tr><td>exit 0</td><td>Success; stdout parsed as JSON if it's one object</td></tr>
+        <tr><td>exit 2</td><td>Block (where the event can block); stderr is the reason fed to Claude</td></tr>
+        <tr><td>other exit</td><td>Non-blocking error; the action continues</td></tr>
+        <tr><td><code>"decision": "block"</code></td><td>JSON alternative to exit 2, with <code>reason</code></td></tr>
+        <tr><td><code>permissionDecision</code></td><td>In <code>hookSpecificOutput</code>: <code>allow</code> · <code>deny</code> · <code>ask</code></td></tr>
+        <tr><td><code>additionalContext</code></td><td>Text added to Claude's context</td></tr>
+        <tr><td><code>continue: false</code></td><td>Stop Claude entirely, with <code>stopReason</code></td></tr>
+        <tr><td><code>matcher</code></td><td><code>Bash</code> · <code>Edit|Write</code> · regex like <code>mcp__.*</code> · omit for all</td></tr>
+        <tr><td><code>type</code></td><td><code>command</code> · <code>http</code> · <code>prompt</code> · <code>mcp_tool</code> · <code>agent</code></td></tr>
+        <tr><td><code>$CLAUDE_PROJECT_DIR</code></td><td>Project root — use it in hook command paths</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec">
+    <h2>Skill frontmatter</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>Defaults to the directory name</td></tr>
+        <tr><td><code>description</code></td><td>How Claude decides to load it — write "Use when…"</td></tr>
+        <tr><td><code>when_to_use</code></td><td>Extra trigger text appended to description</td></tr>
+        <tr><td><code>argument-hint</code></td><td>Autocomplete hint, e.g. <code>[issue-number]</code></td></tr>
+        <tr><td><code>allowed-tools</code></td><td>Tools pre-approved while the skill runs</td></tr>
+        <tr><td><code>disable-model-invocation</code></td><td><code>true</code> = only you can invoke it</td></tr>
+        <tr><td><code>user-invocable</code></td><td><code>false</code> = hidden from the <code>/</code> menu</td></tr>
+        <tr><td><code>context: fork</code></td><td>Run the skill in a sub-agent</td></tr>
+        <tr><td><code>model</code> · <code>effort</code></td><td>Per-skill overrides</td></tr>
+        <tr><td><code>$ARGUMENTS</code> · <code>$0</code></td><td>Arguments in the body (all · by index)</td></tr>
+        <tr><td><code>${CLAUDE_SKILL_DIR}</code></td><td>Path to the skill's folder (for scripts)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec">
+    <h2>Sub-agent frontmatter</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>name</code> (required)</td><td>Identity used for delegation</td></tr>
+        <tr><td><code>description</code> (required)</td><td>When to delegate — "Use proactively after…"</td></tr>
+        <tr><td><code>tools</code> / <code>disallowedTools</code></td><td>Allowlist / denylist (omit = inherit all)</td></tr>
+        <tr><td><code>model</code></td><td><code>sonnet</code> · <code>opus</code> · <code>haiku</code> · <code>inherit</code> · full ID</td></tr>
+        <tr><td><code>permissionMode</code></td><td>e.g. <code>plan</code>, <code>acceptEdits</code></td></tr>
+        <tr><td><code>maxTurns</code></td><td>Cap on turns</td></tr>
+        <tr><td><code>skills</code> · <code>mcpServers</code> · <code>hooks</code></td><td>Preload skills, servers, scoped hooks</td></tr>
+        <tr><td><code>memory</code></td><td>Persistent memory: <code>user</code> · <code>project</code> · <code>local</code></td></tr>
+        <tr><td><code>background: true</code></td><td>Run in the background</td></tr>
+        <tr><td><code>isolation: worktree</code></td><td>Run in a temporary git worktree</td></tr>
+        <tr><td><code>color</code></td><td>UI color (red, blue, green, purple…)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec">
+    <h2>Permission rules</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Rule</th><th>Matches</th></tr></thead>
+      <tbody>
+        <tr><td><code>Bash</code></td><td>Every Bash command</td></tr>
+        <tr><td><code>Bash(npm run test *)</code></td><td>Commands starting <code>npm run test </code></td></tr>
+        <tr><td><code>Bash(npm run test:*)</code></td><td>Same — legacy <code>:*</code> form</td></tr>
+        <tr><td><code>Bash(ls *)</code></td><td><code>ls -la</code> but not <code>lsof</code> (the space matters)</td></tr>
+        <tr><td><code>Read(./.env)</code></td><td>Reading that file</td></tr>
+        <tr><td><code>Edit|Write</code> paths</td><td><code>Edit(src/**)</code> style path globs</td></tr>
+        <tr><td>Order</td><td><strong>deny → ask → allow</strong>; first match wins</td></tr>
+        <tr><td>Caveat</td><td>Bash rules are prefix matches, not a security boundary — use hooks/sandbox</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec">
+    <h2>Permission modes</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Mode</th><th>Behavior</th></tr></thead>
+      <tbody>
+        <tr><td><code>default</code></td><td>Asks before edits and most commands</td></tr>
+        <tr><td><code>acceptEdits</code></td><td>Auto-approves file edits + common fs commands</td></tr>
+        <tr><td><code>plan</code></td><td>Read and plan only; edits blocked until you approve</td></tr>
+        <tr><td><code>auto</code></td><td>Runs with fewer interruptions; good for unattended goals</td></tr>
+        <tr><td><code>dontAsk</code></td><td>Denies anything not pre-allowed (locked-down CI)</td></tr>
+        <tr><td><code>bypassPermissions</code></td><td>No checks — only in isolated sandboxes</td></tr>
+        <tr><td><code>--permission-mode plan</code></td><td>Start a session in a given mode</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec">
+    <h2>/goal &amp; /loop</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Syntax</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>/goal &lt;condition&gt;</code></td><td>Set the session's goal; starts working immediately</td></tr>
+        <tr><td><code>/goal</code></td><td>Show goal status</td></tr>
+        <tr><td><code>/goal clear</code></td><td>Remove it (also <code>stop</code>, <code>off</code>, <code>reset</code>)</td></tr>
+        <tr><td>Evaluator</td><td>Small model judges the transcript after each turn: met / not yet / impossible — it can't run tools</td></tr>
+        <tr><td>Stop clause</td><td>End conditions with "…or stop after N turns"</td></tr>
+        <tr><td><code>/loop 5m &lt;prompt&gt;</code></td><td>Fixed interval (s, m, h, d)</td></tr>
+        <tr><td><code>/loop &lt;prompt&gt;</code></td><td>Self-paced (1 min – 1 h); <kbd>Esc</kbd> stops</td></tr>
+        <tr><td><code>/loop</code></td><td>Runs <code>.claude/loop.md</code> or the built-in prompt</td></tr>
+        <tr><td>Lifetime</td><td>Fires only while the session is open and idle; recurring tasks expire after 7 days</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="cs-sec">
+    <h2>Headless &amp; CLI flags</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Flag</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>claude -p "…"</code></td><td>Run one prompt non-interactively</td></tr>
+        <tr><td><code>--output-format json</code></td><td>Result + <code>session_id</code> + cost as JSON</td></tr>
+        <tr><td><code>--output-format stream-json</code></td><td>NDJSON events (add <code>--verbose</code>)</td></tr>
+        <tr><td><code>--allowedTools</code></td><td>Pre-approve tools, e.g. <code>"Read,Edit,Bash(npm test *)"</code></td></tr>
+        <tr><td><code>--max-turns N</code></td><td>Cap turns (print mode)</td></tr>
+        <tr><td><code>--max-budget-usd N</code></td><td>Stop at an estimated spend</td></tr>
+        <tr><td><code>--permission-mode</code></td><td>Starting mode</td></tr>
+        <tr><td><code>-c</code> / <code>-r &lt;id&gt;</code></td><td>Continue last / resume a session</td></tr>
+        <tr><td><code>-w &lt;name&gt;</code></td><td><code>--worktree</code>: isolated checkout + branch</td></tr>
+        <tr><td><code>--agent &lt;name&gt;</code></td><td>Run the session as a sub-agent definition</td></tr>
+        <tr><td><code>--append-system-prompt</code></td><td>Add instructions, keep defaults</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  </div>
+
+  <hr>
+  <h2>Final exam</h2>
+  <p>Fifteen questions across all eight lessons. Aim for 12+. Every wrong answer links back to a concept worth a second read.</p>
+  <div id="quiz"></div>
+</article>
+</main>
+
+<script src="../assets/app.js"></script>
+<script>
+TUTOR.ready(function () {
+  /* Filter rows across every cheat-sheet table; hide sections with no matches. */
+  var q = document.getElementById("cs-q"), count = document.getElementById("cs-count"), empty = document.getElementById("cs-empty");
+  var secs = Array.prototype.slice.call(document.querySelectorAll(".cs-sec"));
+  var total = document.querySelectorAll(".cs-sec tbody tr").length;
+  function apply() {
+    var term = q.value.trim().toLowerCase(), shown = 0;
+    secs.forEach(function (sec) {
+      var title = sec.querySelector("h2").textContent.toLowerCase();
+      var titleHit = term && title.indexOf(term) !== -1;
+      var hits = 0;
+      sec.querySelectorAll("tbody tr").forEach(function (tr) {
+        var ok = !term || titleHit || tr.textContent.toLowerCase().indexOf(term) !== -1;
+        tr.style.display = ok ? "" : "none";
+        if (ok) hits++;
+      });
+      sec.style.display = hits ? "" : "none";
+      shown += hits;
+    });
+    count.textContent = term ? shown + " of " + total + " rows" : total + " rows";
+    empty.style.display = shown ? "none" : "block";
+  }
+  q.addEventListener("input", apply);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "/" && document.activeElement !== q && !/input|textarea/i.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); }
+  });
+  apply();
+
+  TUTOR.quiz("#quiz", { title: "Final exam", questions: [
+    { q: "An agent is best described as…", options: ["A bigger model", "Model + tools + a loop", "A prompt template", "A vector database"],
+      answer: 1, why: "Lesson 1: the loop — gather, act, verify — is the part you control." },
+    { q: "The most common cause of 'it said tests pass but they don't' is a missing…", options: ["Gather phase", "Verify phase", "Sub-agent", "Output style"],
+      answer: 1, why: "Premature victory = skipped verification. Make verification a requirement, not a hope." },
+    { q: "What belongs in CLAUDE.md?", options: ["Your full API docs pasted inline", "Commands, conventions and gotchas Claude can't infer from the code", "A transcript of past sessions", "Secrets it needs"],
+      answer: 1, why: "Lesson 2: keep it short and behavior-changing; import longer docs with @path." },
+    { q: "How do you pull another file into CLAUDE.md?", options: ["#include docs/api.md", "@docs/api.md", "{{docs/api.md}}", "import docs/api.md"],
+      answer: 1, why: "@path imports work anywhere in CLAUDE.md, up to 4 hops deep." },
+    { q: "In plan mode, Claude…", options: ["Edits freely", "Reads and plans, but source edits are blocked until you approve", "Only runs tests", "Can't read files"],
+      answer: 1, why: "Lesson 3: plan mode separates exploration from execution so you catch the wrong approach cheaply." },
+    { q: "Which Shift+Tab cycle order is correct?", options: ["plan → default → auto", "default → acceptEdits → plan → …", "acceptEdits → default → plan", "auto → plan → default"],
+      answer: 1, why: "default → acceptEdits → plan, then auto (and bypassPermissions only if enabled)." },
+    { q: "The /goal evaluator decides 'met' by…", options: ["Running your test suite", "Reading the transcript — it can't run tools", "Asking you", "Checking git status"],
+      answer: 1, why: "Lesson 4: so write conditions that ask Claude to show evidence in the transcript." },
+    { q: "Why add 'or stop after 20 turns' to a goal?", options: ["It's required syntax", "To bound cost if the goal is impossible as written", "To speed up the model", "To enable hooks"],
+      answer: 1, why: "A stop clause is your budget. Without it, an unreachable goal can burn many turns." },
+    { q: "/loop without an interval…", options: ["Errors", "Runs once", "Lets Claude self-pace between runs", "Runs every second"],
+      answer: 2, why: "Self-paced loops pick their own delay (1 min – 1 h). Esc stops them." },
+    { q: "A PreToolUse hook exits with code 2. What happens?", options: ["The tool runs and the hook is ignored", "The tool call is blocked and stderr goes to Claude", "Claude Code crashes", "The session ends"],
+      answer: 1, why: "Lesson 5: exit 2 = blocking error; stderr is the reason. Other non-zero codes are non-blocking." },
+    { q: "Which is the best fit for a hook rather than CLAUDE.md?", options: ["'Prefer named exports'", "'Never run git push --force'", "'Our API uses REST'", "'Be concise'"],
+      answer: 1, why: "Anything that must never happen deserves deterministic enforcement." },
+    { q: "Which part of a skill is always in Claude's context?", options: ["The whole SKILL.md", "Just its name and description", "Its scripts", "Nothing until you type /skill"],
+      answer: 1, why: "Lesson 6: progressive disclosure — the body loads only when relevant." },
+    { q: "A skill never triggers. The first thing to fix is…", options: ["The model", "Its description — make it say when to use it", "The folder name casing", "allowed-tools"],
+      answer: 1, why: "Claude matches requests against the description. Write it as 'Use when…' with the words users actually say." },
+    { q: "The main benefit of delegating codebase exploration to a sub-agent is…", options: ["It's always faster", "Its file reads stay in its own context; only a summary returns", "It can't make mistakes", "It bypasses permissions"],
+      answer: 1, why: "Lesson 7: context isolation keeps the main window clean for the actual work." },
+    { q: "Two agents need to edit the same repo in parallel. Use…", options: ["Two tabs in one checkout", "claude --worktree for each", "One agent with a longer prompt", "/compact"],
+      answer: 1, why: "Worktrees give each agent its own checkout and branch; merge afterward (lesson 8, M6)." }
+  ]});
+});
+</script>
+</body>
+</html>

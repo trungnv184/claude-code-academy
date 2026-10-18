@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goals &amp; Loops · Conducting Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-root=".." data-lesson="04">
+<main>
+<article class="article">
+  <div class="eyebrow">Lesson 4 · /goal, /loop, verification</div>
+  <h1>Goals &amp; Loops</h1>
+  <p class="dek">By default the model decides when it's done, and the model is an optimist. This lesson is about moving the finish line out of the model's head and into something it can't argue with.</p>
+  <div class="byline"><span>25 min read</span><span>1 lab</span><span>1 simulator</span><span>Quiz</span></div>
+
+  <div class="objectives">
+    <h4>By the end of this lesson you will</h4>
+    <ul>
+      <li>Explain why agents stop early, and what makes a finish line "unfakeable"</li>
+      <li>Use <code>/goal</code> correctly: how it is evaluated, why the evaluator only sees the transcript, and how to bound it</li>
+      <li>Write goal conditions that converge, and recognize ones that never will</li>
+      <li>Choose between <code>/goal</code>, <code>/loop</code>, <code>/schedule</code> and a plain Ralph-style shell loop</li>
+      <li>Put cost ceilings on anything that runs unattended</li>
+    </ul>
+  </div>
+
+  <div data-toc></div>
+
+  <h2>The optimist in the loop</h2>
+  <p>Go back to the twelve lines of pseudocode in <a href="01-agent-loop.html">lesson 1</a>. The loop ends when the model replies without asking for a tool. Nothing checks that the work is actually finished. The model simply stops wanting to do more.</p>
+  <p>That's fine for "rename this variable." It's a problem for "fix the checkout bug," because language models are trained to produce helpful-sounding completions, and few things sound more helpful than "Done! All tests pass." Sometimes that sentence is true. Sometimes the tests were never run. Sometimes three of them were quietly skipped. The model isn't lying in any meaningful sense. It reached a plausible stopping point and said a plausible thing.</p>
+  <div class="pull">An agent without a finish line stops when it feels done. An agent with a finish line stops when it <em>is</em> done.</div>
+  <p>We call this failure <strong>premature victory</strong>, and it's the most expensive failure mode in practice. A wrong approach is visible in the plan, and rule drift is visible in the diff. Premature victory looks exactly like success until you or your CI find out otherwise.</p>
+
+  <h2>Finish lines the agent can't fake</h2>
+  <p>The fix is to define "done" as something a machine checks, not something the model believes. Good finish lines share three properties:</p>
+  <ul>
+    <li><strong>External.</strong> The truth comes from a tool, not from the model's self-report: a test runner, a type checker, a linter, <code>curl</code> against a running server, a screenshot diff.</li>
+    <li><strong>Binary or numeric.</strong> Exit code 0. Zero type errors. Lighthouse score ≥ 90. Coverage at least 80%. Not "clean," not "robust," not "works properly."</li>
+    <li><strong>Visible.</strong> The evidence ends up somewhere the checker can see: the transcript, a log file, a CI status.</li>
+  </ul>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Fakeable finish line</th><th>Unfakeable version</th></tr></thead>
+    <tbody>
+      <tr><td>"Fix the bug"</td><td>"Add a regression test that fails before the fix and passes after; <code>npm test</code> exits 0"</td></tr>
+      <tr><td>"Make it type-safe"</td><td>"<code>tsc --noEmit</code> reports 0 errors, and no new <code>any</code> or <code>@ts-ignore</code> appears in the diff"</td></tr>
+      <tr><td>"Make the page faster"</td><td>"Lighthouse performance ≥ 90 on <code>/checkout</code> in the CI run"</td></tr>
+      <tr><td>"Clean up the code"</td><td>"<code>eslint .</code> exits 0 with the stricter config in <code>.eslintrc.strict.json</code>"</td></tr>
+      <tr><td>"Migrate to the new API"</td><td>"<code>grep -r legacyClient src/</code> returns nothing and the full suite passes"</td></tr>
+    </tbody>
+  </table></div>
+  <p>Once you have a finish line like that, there are three escalating ways to enforce it. You can <em>ask</em> for it in the prompt, which is advisory and often enough. You can set a <code>/goal</code>, which a second model checks after every turn. Or you can write a Stop hook, a script that physically runs the tests before Claude may stop; that's covered in <a href="05-hooks.html">lesson 5</a>. This lesson covers the middle option and the loops built on it.</p>
+
+  <h2>How /goal actually works</h2>
+  <p><code>/goal</code> is the most direct way to give a session a finish line. You type a condition and Claude starts working on it immediately. After each turn, before Claude is allowed to stop, the condition is checked.</p>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 760 270" role="img" aria-label="Diagram: Claude takes a turn, then a fast evaluator model reads the transcript and decides met, not yet met, or impossible">
+        <defs><marker id="g1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker></defs>
+        <rect x="20" y="95" width="170" height="80" rx="12" class="d-box"/>
+        <text x="105" y="128" text-anchor="middle" font-weight="700" font-size="15">/goal &lt;condition&gt;</text>
+        <text x="105" y="150" text-anchor="middle" class="d-muted" font-size="12">starts a turn</text>
+        <rect x="245" y="95" width="170" height="80" rx="12" class="d-accent"/>
+        <text x="330" y="128" text-anchor="middle" font-weight="700" font-size="15">Claude's turn</text>
+        <text x="330" y="150" text-anchor="middle" class="d-muted" font-size="12">gather · act · verify</text>
+        <rect x="470" y="95" width="170" height="80" rx="12" class="d-box"/>
+        <text x="555" y="122" text-anchor="middle" font-weight="700" font-size="15">Evaluator</text>
+        <text x="555" y="142" text-anchor="middle" class="d-muted" font-size="12">small fast model</text>
+        <text x="555" y="158" text-anchor="middle" class="d-muted" font-size="12">reads transcript only</text>
+        <text x="700" y="88" text-anchor="middle" font-size="13" font-weight="600" style="fill:var(--green)">met → stop</text>
+        <text x="700" y="190" text-anchor="middle" font-size="13" font-weight="600" style="fill:var(--red)">impossible → stop</text>
+        <g class="d-line" stroke-width="1.5" marker-end="url(#g1)">
+          <path d="M190 135 L 242 135"/><path d="M415 135 L 467 135"/>
+          <path d="M640 120 L 690 98"/><path d="M640 150 L 690 178"/>
+          <path d="M555 177 C 555 245, 330 245, 330 179"/>
+        </g>
+        <text x="442" y="236" text-anchor="middle" class="d-muted" font-size="12.5">not yet met → Claude keeps working</text>
+      </svg>
+    </div>
+    <figcaption>/goal is a session-scoped, prompt-based Stop hook. You don't configure the hook; the command sets it up for you.</figcaption>
+  </figure>
+  <p>Under the hood, <code>/goal</code> is a <strong>prompt-based Stop hook</strong> scoped to your session. When Claude tries to end its turn, a small, fast model is asked whether the condition holds and answers one of three ways: <em>met</em> (Claude may stop), <em>not yet met</em> (Claude is sent back to work), or <em>impossible</em> (stop trying). You get the stop-gate behavior of <a href="05-hooks.html">lesson 5</a> without writing a script.</p>
+
+  <h3>The one thing to understand: the evaluator can't run tools</h3>
+  <p>The evaluator does not run your tests. It can't run anything. It reads what's already in the transcript and judges whether that text satisfies your condition. This has a direct consequence for how you write goals:</p>
+  <div class="callout warn"><div class="callout-icon">⚠</div><div><div class="callout-title">If it isn't in the transcript, it didn't happen</div><p>A condition like "the tests pass" invites Claude to <em>say</em> the tests pass. A condition like "<code>npm test</code> exits 0 <em>and the output is shown in the transcript</em>" makes Claude run the command where the evaluator can see the result. Always ask for visible evidence.</p></div></div>
+  <p>If you need a gate that executes a check itself, that's a <code>command</code> Stop hook (lesson 5). <code>/goal</code> trades that rigor for zero setup, and the trade is usually worth it as long as you ask for evidence.</p>
+
+  <h3>The mechanics</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>/goal &lt;condition&gt;</code></td><td>Sets the goal and immediately starts a turn with the condition as the directive. Conditions can be long (up to 4,000 characters).</td></tr>
+      <tr><td><code>/goal</code></td><td>Shows the current goal's status.</td></tr>
+      <tr><td><code>/goal clear</code></td><td>Removes it. <code>stop</code>, <code>off</code>, <code>reset</code>, <code>none</code> and <code>cancel</code> work too. <code>/clear</code> also removes the goal.</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>One goal per session.</strong> Setting a new one replaces the old one. If you have three outcomes, combine them into one condition ("A and B and C").</li>
+    <li><strong>It doesn't change your permission mode.</strong> In the default mode you'll still approve each edit and command, which defeats the point of an unattended run. Pair it with a mode that lets Claude act, such as auto mode, inside a project with sensible <code>permissions.deny</code> rules and hooks.</li>
+    <li><strong>Always add a bound.</strong> End the condition with "or stop after 20 turns." That turns a potentially infinite loop into a bounded experiment.</li>
+  </ul>
+  <p>It also works headless, which makes it a building block for scripts and CI:</p>
+<pre><code class="lang-bash"># run a goal non-interactively; Ctrl+C interrupts it
+claude -p "/goal CHANGELOG.md has an entry for every PR merged this week, or stop after 15 turns"
+
+# watch progress as it happens
+claude -p "/goal npm test exits 0 with output shown, or stop after 20 turns" \
+  --output-format stream-json --verbose
+</code></pre>
+
+  <h2>Writing goals that converge</h2>
+  <p>A good goal condition reads like an acceptance test. Here is the checklist the lab below uses, and the one I use every time:</p>
+  <ol>
+    <li><strong>Name the evidence.</strong> Which command, which file, which output? "<code>npm run typecheck</code> exits 0" beats "no type errors."</li>
+    <li><strong>Make it measurable.</strong> Exit codes, counts, thresholds. Every subjective word ("clean," "properly," "better") is one the evaluator can't confirm. It will either accept it on faith or never accept it.</li>
+    <li><strong>Demand visibility.</strong> "…with the final output shown in the transcript."</li>
+    <li><strong>Bound it.</strong> "…or stop after N turns." Pick N at roughly two to three times what you'd expect.</li>
+    <li><strong>Scope it.</strong> "tests in <code>tests/cart</code>" converges faster than "all tests" in a repo with known-flaky e2e suites.</li>
+  </ol>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Goal condition</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>"make the cart work properly"</td><td>Claude says "works properly now!" and the evaluator accepts it. <strong>False met.</strong></td></tr>
+      <tr><td>"tests pass and the code is clean"</td><td>Tests go green, but "clean" never becomes provable. <strong>Spins forever</strong> (or until the bound).</td></tr>
+      <tr><td>"<code>npm test -- tests/cart</code> exits 0 and <code>npm run typecheck</code> exits 0"</td><td>Converges, but an impossible task (missing env var, flaky test) would never stop.</td></tr>
+      <tr><td>"…both exit 0, with the final output shown in the transcript, or stop after 15 turns"</td><td><strong>Converges on evidence</strong>, and gives up cleanly if it can't.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div data-widget="goal-lab"></div>
+
+  <h2>/loop: work on a timer</h2>
+  <p><code>/goal</code> answers "keep going until X." <code>/loop</code> answers a different question: "do this again every so often." It's a bundled skill that schedules a prompt to re-run inside your session.</p>
+<pre><code class="lang-bash"># fixed interval (s, m, h, d; seconds round up to a minute)
+/loop 5m check whether the deploy finished and summarize any errors
+
+# no interval: Claude paces itself, between 1 minute and 1 hour
+/loop keep an eye on the CI run for this branch and fix lint failures
+
+# no prompt: runs .claude/loop.md (project) or ~/.claude/loop.md (user) if present,
+# otherwise a built-in maintenance prompt
+/loop
+</code></pre>
+  <p>A few constraints worth knowing before you rely on it:</p>
+  <ul>
+    <li><strong>Your session has to be running.</strong> Loop tasks fire only while Claude Code is open and idle. Close the terminal and the loop stops. If you <code>--resume</code> or <code>--continue</code>, most interval tasks come back, but self-paced loops don't.</li>
+    <li><strong>Recurring tasks expire after 7 days.</strong> This is a safety net against forgotten loops.</li>
+    <li><strong>Stop a self-paced loop with <kbd>Esc</kbd>.</strong></li>
+    <li><strong>Commit <code>.claude/loop.md</code></strong> if your team has a standard "babysit this repo" routine. Then a bare <code>/loop</code> does the right thing for everyone.</li>
+  </ul>
+  <div class="callout info"><div class="callout-icon">☁</div><div><div class="callout-title">Need it to run when your laptop is closed?</div><p><code>/schedule</code> (alias <code>/routines</code>) creates <strong>cloud routines</strong> that run on a cron schedule without your machine, with a minimum interval of one hour. Use <code>/loop</code> for "while I'm working" and <code>/schedule</code> for "every morning at 8."</p></div></div>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tool</th><th>Question it answers</th><th>Stops when</th><th>Runs where</th></tr></thead>
+    <tbody>
+      <tr><td><code>/goal</code></td><td>Keep going until X is true</td><td>Evaluator says met/impossible, or you clear it</td><td>Your session (or <code>claude -p</code>)</td></tr>
+      <tr><td><code>/loop</code></td><td>Do this every N minutes</td><td><kbd>Esc</kbd>, session ends, or 7-day expiry</td><td>Your running session</td></tr>
+      <tr><td><code>/schedule</code></td><td>Do this on a calendar</td><td>You delete the routine</td><td>The cloud</td></tr>
+      <tr><td>Ralph loop</td><td>Restart fresh until the work is done</td><td>Your script's exit condition</td><td>Your shell / CI</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The Ralph loop: fresh context, persistent progress</h2>
+  <p>There's an older, cruder and surprisingly effective pattern that predates <code>/goal</code>. Geoffrey Huntley popularized it as the <a href="https://ghuntley.com/ralph/" target="_blank" rel="noopener">"Ralph Wiggum" technique</a>: run the agent in a plain shell <code>while</code> loop and feed it the same prompt every time. Each iteration starts with a <strong>fresh context window</strong>, so context rot never builds up. Continuity lives in files: a spec, a progress log and the git history.</p>
+  <div class="code-file"><span>ralph.sh</span><span>bash</span></div>
+<pre><code class="lang-bash">#!/usr/bin/env bash
+# Run Claude repeatedly on the same prompt until the work is done (or we hit a cap).
+set -euo pipefail
+MAX=25
+for i in $(seq 1 "$MAX"); do
+  echo "── iteration $i ──"
+  claude -p "$(cat PROMPT.md)" \
+    --permission-mode acceptEdits \
+    --allowedTools "Read,Edit,Write,Bash(npm test *),Bash(git add *),Bash(git commit *)" \
+    --max-turns 40
+  # the exit condition is checked by the shell, not the model
+  if grep -q "STATUS: COMPLETE" progress.md &amp;&amp; npm test --silent; then
+    echo "done after $i iterations"; exit 0
+  fi
+done
+echo "hit iteration cap"; exit 1
+</code></pre>
+  <div class="code-file"><span>PROMPT.md</span><span>markdown</span></div>
+<pre><code class="lang-md"># Task
+Implement the features in SPEC.md, one at a time.
+
+## Each iteration
+1. Read progress.md to see what's done. Pick the next unchecked item.
+2. Write a failing test for it, then make it pass.
+3. Run `npm test`. Only if it exits 0: tick the item in progress.md and commit.
+4. If every item is ticked and tests pass, write `STATUS: COMPLETE` at the top of progress.md.
+
+Never mark an item done without a passing test. Keep commits small.
+</code></pre>
+  <p>Notice where the finish line lives: in <code>grep</code> and <code>npm test</code>, run by the shell. The model can write "STATUS: COMPLETE" all it likes; the loop only exits if the tests agree. Notice also that the prompt never changes. All the state is in <code>progress.md</code> and git, which is exactly the "write state to files, not chat" advice from lesson 1 turned into an architecture.</p>
+  <div class="callout pro"><div class="callout-icon">🎼</div><div><div class="callout-title">When to use which</div><p>Use <code>/goal</code> for one task that fits comfortably in a session. Reach for a Ralph loop when the work is long enough that a single context window would rot: a 30-item spec, a big migration, an overnight run. Each iteration is a clean, cheap restart.</p></div></div>
+
+  <h2>TDD is the original agent loop</h2>
+  <p>Red, green, refactor is a loop with a built-in, unfakeable finish line, which is why test-driven development fits agents unusually well. The workflow that works:</p>
+  <ol>
+    <li>Ask Claude to <strong>write tests only</strong>, from the spec, and to confirm they fail. Tell it explicitly not to write the implementation yet.</li>
+    <li><strong>Commit the tests.</strong> Now they're a fixed target.</li>
+    <li>Set the goal: "<code>npm test</code> exits 0 with output shown, without modifying anything under <code>tests/</code>, or stop after 20 turns."</li>
+    <li>Review the diff. The tests did the arguing for you.</li>
+  </ol>
+  <p>That "without modifying tests" clause matters. An agent under pressure to make tests pass will sometimes "fix" the test. Put the rule in the goal condition, and if it's important enough, enforce it with a hook that blocks edits to <code>tests/</code> during implementation (lesson 5).</p>
+
+  <h2>Runaway protection</h2>
+  <p>Loops are where agents get expensive. A goal that never converges, or a Ralph loop with a bug in its exit condition, will happily burn turns until something stops it. Put a ceiling on every unattended run:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Safeguard</th><th>Where</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td>"…or stop after N turns"</td><td>Goal condition</td><td>The evaluator treats the bound as part of "met"</td></tr>
+      <tr><td><code>--max-turns N</code></td><td><code>claude -p</code></td><td>Print mode errors out when the turn cap is reached</td></tr>
+      <tr><td><code>--max-budget-usd 5</code></td><td><code>claude -p</code></td><td>Stops at an estimated dollar cap</td></tr>
+      <tr><td>Iteration cap (<code>MAX=25</code>)</td><td>Your shell loop</td><td>Bounds the number of fresh sessions</td></tr>
+      <tr><td><code>/usage</code></td><td>Interactive</td><td>Check spend and plan limits mid-session</td></tr>
+    </tbody>
+  </table></div>
+<pre><code class="lang-bash"># an unattended goal run with three independent ceilings
+claude -p "/goal npm test exits 0 with output shown, or stop after 20 turns" \
+  --max-turns 60 --max-budget-usd 5 --output-format json | jq -r '.result'
+</code></pre>
+
+  <h2>Try it: goals and loops in the terminal</h2>
+  <p>A scripted simulation. Set a goal and watch the evaluator gate each turn, then check status, clear it and try <code>/loop</code>.</p>
+  <div id="term-goal"></div>
+
+  <h2>Key takeaways</h2>
+  <ul>
+    <li><strong>Premature victory</strong> happens because the model decides when it's done. Move "done" into something external, binary and visible.</li>
+    <li><code>/goal</code> is a <strong>session-scoped, prompt-based Stop hook</strong>: a fast model judges <em>the transcript</em> after each turn. Ask for evidence in the transcript, and always add "or stop after N turns."</li>
+    <li>Subjective words make goals either <strong>falsely met</strong> or <strong>never met</strong>. Write conditions like acceptance tests.</li>
+    <li><code>/loop</code> repeats work while your session runs; <code>/schedule</code> runs routines in the cloud; a <strong>Ralph loop</strong> restarts fresh sessions with state in files.</li>
+    <li>Every unattended run gets a ceiling: turn bounds, <code>--max-turns</code>, <code>--max-budget-usd</code>, iteration caps.</li>
+  </ul>
+
+  <div id="quiz"></div>
+</article>
+</main>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/widgets/goal-lab.js"></script>
+<script>
+TUTOR.ready(function () {
+  var GOOD = "all tests in tests/cart pass and npm run typecheck exits 0, or stop after 15 turns";
+  TUTOR.terminal("#term-goal", {
+    title: "claude — ~/shop-web",
+    hints: ["/goal " + GOOD, "/goal", "/goal clear", "/goal make it better", "/loop 5m check CI", "/loop"],
+    banner: [
+      ["sys", "✻ Claude Code (simulated) · cwd: ~/shop-web", 80],
+      ["sys", "  mode: auto · no goal set", 80]
+    ],
+    commands: [
+      { match: /^\/goal\s+(clear|stop|off|reset|none|cancel)$/i, steps: function (_, ctx) {
+        var had = ctx.state.goal; ctx.state.goal = null;
+        return had ? [["sys", "Goal cleared: \"" + had + "\""], ["sys", "Claude may now stop normally."]] : [["sys", "No active goal."]];
+      }},
+      { match: /^\/goal$/i, steps: function (_, ctx) {
+        if (!ctx.state.goal) return [["sys", "No active goal. Usage: /goal <condition>"]];
+        return [["sys", "Goal: \"" + ctx.state.goal + "\""], ["sys", "Status: " + (ctx.state.met ? "met ✓ (turn " + ctx.state.turns + ")" : "not yet met · " + ctx.state.turns + " turns so far")]];
+      }},
+      { match: /^\/goal\s+.+/i, steps: function (input, ctx) {
+        var cond = input.replace(/^\/goal\s+/i, "");
+        ctx.state.goal = cond; ctx.state.turns = 0; ctx.state.met = false;
+        var vague = !/(npm|test|exit|tsc|typecheck|pass|\d)/i.test(cond);
+        if (vague) {
+          ctx.state.turns = 2; ctx.state.met = true;
+          return [
+            ["sys", "Goal set: \"" + cond + "\""],
+            ["tool", "Read(src/cart/Cart.tsx)"],
+            ["tool", "Edit(src/cart/Cart.tsx)"], ["toolout", "Tidied up the component, renamed a few variables"],
+            ["claude", "I've made the cart better — cleaner code and clearer names."],
+            ["hook", "Stop hook (goal) → evaluator: met — the transcript says it's better."],
+            ["err", "⚠ Nothing in this condition required evidence, so a claim was enough. No test was run."],
+            ["sys", "Try a measurable goal: /goal " + GOOD]
+          ];
+        }
+        ctx.state.turns = 5; ctx.state.met = true;
+        return [
+          ["sys", "Goal set: \"" + cond + "\""],
+          ["tool", "Bash(npm test -- tests/cart)"], ["toolout", "✗ 2 failed · 10 passed"],
+          ["hook", "Stop hook (goal) → not yet met: transcript shows 2 failing tests. Continue."],
+          ["tool", "Read(src/cart/total.ts)"], ["toolout", "coupon applied after tax (line 41)"],
+          ["tool", "Edit(src/cart/total.ts)"],
+          ["tool", "Bash(npm test -- tests/cart)"], ["toolout", "✓ 12 passed"],
+          ["hook", "Stop hook (goal) → not yet met: no typecheck output in transcript. Continue."],
+          ["tool", "Bash(npm run typecheck)"], ["toolout", "tsc --noEmit · exit 0"],
+          ["hook", "Stop hook (goal) → met: cart tests pass and typecheck exited 0 (turn 5 of max 15)."],
+          ["claude", "Done. Coupon is now applied before tax; 12/12 cart tests pass and typecheck is clean. Evidence is above."]
+        ];
+      }},
+      { match: /^\/loop\s+\d+[smhd]\b.*/i, steps: function (input) {
+        var m = input.match(/^\/loop\s+(\d+)([smhd])\s*(.*)$/i);
+        var n = m[1], u = m[2], p = m[3] || "the default maintenance prompt";
+        var shown = u === "s" ? Math.max(1, Math.ceil(n / 60)) + "m (seconds round up to a minute)" : n + u;
+        return [
+          ["sys", "Scheduled: every " + shown + " → \"" + p + "\""],
+          ["sys", "Runs only while this session is open and idle · expires in 7 days"],
+          ["mode", "  … " + n + u + " later"],
+          ["tool", "Bash(gh run list --branch feat/coupons --limit 1)"], ["toolout", "in_progress · build-and-test"],
+          ["claude", "CI still running (4m in). I'll check again on the next tick."],
+          ["mode", "  … " + n + u + " later"],
+          ["tool", "Bash(gh run list --branch feat/coupons --limit 1)"], ["toolout", "completed · failure · lint"],
+          ["tool", "Bash(npm run lint -- --fix && git commit -am 'fix lint')"],
+          ["claude", "CI failed on lint only. Fixed with eslint --fix and committed. Waiting for the next run."]
+        ];
+      }},
+      { match: /^\/loop$/i, steps: [
+        ["tool", "Read(.claude/loop.md)"], ["toolout", "\"Check open PRs for review comments; fix CI failures on my branches.\""],
+        ["sys", "Self-paced loop started using .claude/loop.md · Claude picks the next wake-up (1m–1h) · Esc to stop"],
+        ["claude", "2 PRs have new comments; addressed both. Nothing else pending — next check in ~20m."]
+      ]},
+      { match: /^\/loop\s+.+/i, steps: function (input) {
+        return [
+          ["sys", "Self-paced loop: \"" + input.replace(/^\/loop\s+/i, "") + "\" · Claude picks each interval (1m–1h) · Esc to stop"],
+          ["claude", "First pass done. Next check in ~10m."]
+        ];
+      }}
+    ],
+    fallback: function () {
+      return [["claude", "This simulator scripts /goal and /loop. Try a vague goal and a measurable one, then compare."]];
+    }
+  });
+
+  TUTOR.quiz("#quiz", { questions: [
+    { q: "You set /goal \"the tests pass\". Claude replies \"All tests pass!\" without running anything, and the goal is marked met. Why?",
+      options: ["/goal is broken", "The evaluator reads the transcript and can't run tools, so a claim satisfied a condition that asked for no evidence", "Claude has a bug in its test runner", "The goal was too long"],
+      answer: 1, why: "The /goal evaluator is a fast model judging the transcript. Ask for evidence: \"npm test exits 0 with the output shown in the transcript\"." },
+    { q: "Which goal condition is most likely to converge correctly?",
+      options: ["\"make the code clean and robust\"", "\"fix the bug\"", "\"npm test exits 0 and tsc --noEmit reports 0 errors, outputs shown, or stop after 20 turns\"", "\"keep improving until it's perfect\""],
+      answer: 2, why: "It names evidence, is binary, demands visibility and is bounded." },
+    { q: "You want Claude to check the deploy every 10 minutes while you work. What fits best?",
+      options: ["/goal deploy is done", "/loop 10m check the deploy and report errors", "/schedule a daily routine", "/compact"],
+      answer: 1, why: "/loop re-runs a prompt on an interval inside your running session. /schedule is for cloud routines with at least an hourly interval." },
+    { q: "What is the main advantage of a Ralph loop over a single long /goal session?",
+      options: ["It uses a bigger model", "Each iteration starts with a fresh context window, and state persists in files and git", "It doesn't need tests", "It runs in the cloud"],
+      answer: 1, why: "Fresh context per iteration avoids context rot on long tasks. Progress lives in progress.md and commits." },
+    { q: "Which flag stops a headless run once it reaches an estimated dollar amount?",
+      options: ["--max-turns", "--max-budget-usd", "--output-format json", "--bare"],
+      answer: 1, why: "--max-budget-usd (print mode) caps estimated spend. --max-turns caps turns." }
+  ]});
+});
+</script>
+</body>
+</html>
